@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Jefes Inmediatos{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-0 fw-bold" style="color: #E32822;">
+        <i class="fas fa-user-tie me-2"></i>Jefes Inmediatos
+      </h2>
+      <small class="text-muted">Gestión de jefes y sus correos</small>
+    </div>
+    <a href="{% url 'periodo:agregar_jefe' %}" class="btn btn-danger">
+      <i class="fas fa-plus me-1"></i>Agregar Jefe
+    </a>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-header text-white py-3" style="background-color: #E32822;">
+      <h5 class="mb-0 fw-bold">
+        <i class="fas fa-table me-2"></i>Listado de Jefes Inmediatos
+      </h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead style="background-color: #f8f9fa;">
+            <tr>
+              <th class="px-3">#</th>
+              <th>Nombre</th>
+              <th>Correo</th>
+              <th class="text-center">Colaboradores</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for jefe in jefes %}
+            <tr>
+              <td class="px-3 text-muted">{{ forloop.counter }}</td>
+              <td class="fw-semibold">{{ jefe.nombre }}</td>
+              <td>
+                {% if jefe.correo %}
+                  <a href="mailto:{{ jefe.correo }}">{{ jefe.correo }}</a>
+                {% else %}
+                  <span class="badge bg-warning text-dark">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Sin correo
+                  </span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <span class="badge bg-secondary">{{ jefe.colaboradores.count }}</span>
+              </td>
+              <td class="text-center">
+                <div class="d-flex gap-1 justify-content-center">
+                  <a href="{% url 'periodo:editar_jefe' jefe.pk %}"
+                     class="btn btn-sm btn-outline-primary" title="Editar">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <a href="{% url 'periodo:eliminar_jefe' jefe.pk %}"
+                     class="btn btn-sm btn-outline-danger" title="Eliminar">
+                    <i class="fas fa-trash"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center py-5 text-muted">
+                <i class="fas fa-user-tie fa-3x mb-3 d-block"></i>
+                No hay jefes registrados.
+                <a href="{% url 'periodo:agregar_jefe' %}" class="d-block mt-2">Agregar el primero</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

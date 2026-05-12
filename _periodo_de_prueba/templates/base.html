@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Sistema de Seguimiento{% endblock %}</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --rojo: #E32822;
+      --rojo-oscuro: #b51f1a;
+    }
+
+    body {
+      background-color: #f4f6f9;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .navbar-top {
+      background-color: var(--rojo);
+      padding: 0.6rem 1.5rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    .navbar-top .navbar-brand {
+      color: #fff !important;
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: 0.5px;
+    }
+
+    .navbar-top .nav-link {
+      color: rgba(255,255,255,0.88) !important;
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .navbar-top .nav-link:hover,
+    .navbar-top .nav-link.active {
+      background-color: rgba(255,255,255,0.18);
+      color: #fff !important;
+    }
+
+    .navbar-toggler {
+      border-color: rgba(255,255,255,0.5);
+    }
+
+    .navbar-toggler-icon {
+      filter: invert(1);
+    }
+
+    .main-wrapper {
+      min-height: calc(100vh - 60px);
+    }
+
+    .content-area {
+      padding: 1.8rem 1.5rem;
+    }
+
+    .card {
+      border-radius: 10px;
+    }
+
+    .card-header {
+      border-radius: 10px 10px 0 0 !important;
+    }
+
+    .table thead th {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #555;
+      border-bottom: 2px solid #dee2e6;
+    }
+
+    .table tbody tr:hover {
+      background-color: #fff8f8;
+    }
+
+    .btn-danger {
+      background-color: var(--rojo);
+      border-color: var(--rojo);
+    }
+    .btn-danger:hover {
+      background-color: var(--rojo-oscuro);
+      border-color: var(--rojo-oscuro);
+    }
+    .btn-outline-danger {
+      color: var(--rojo);
+      border-color: var(--rojo);
+    }
+    .btn-outline-danger:hover {
+      background-color: var(--rojo);
+      border-color: var(--rojo);
+    }
+
+    .footer {
+      background-color: #fff;
+      border-top: 1px solid #dee2e6;
+      padding: 0.8rem 1.5rem;
+      font-size: 0.8rem;
+      color: #888;
+      text-align: center;
+    }
+
+    .messages-container {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      z-index: 9999;
+      min-width: 300px;
+    }
+  </style>
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-top navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{% url 'periodo:lista' %}">
+        <i class="fas fa-hard-hat me-2"></i>SISTEMA DE SEGUIMIENTO
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav ms-auto align-items-center gap-1">
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'lista' %}active{% endif %}"
+               href="{% url 'periodo:lista' %}">
+              <i class="fas fa-users me-1"></i>Colaboradores
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'jefe' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'periodo:lista_jefes' %}">
+              <i class="fas fa-user-tie me-1"></i>Jefes Inmediatos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'periodo:agregar' %}">
+              <i class="fas fa-user-plus me-1"></i>Registrar
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'admin:index' %}">
+              <i class="fas fa-cog me-1"></i>Admin
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MENSAJES DJANGO -->
+  {% if messages %}
+  <div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm"
+         role="alert">
+      <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="main-wrapper">
+    <div class="content-area">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    Sistema de Seguimiento &mdash; Periodo de Prueba &copy; 2026 &nbsp;|&nbsp;
+    CARBOINSA &bull; INCARSA &bull; UNIMINAS &bull; MILPA
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    setTimeout(() => {
+      document.querySelectorAll('.messages-container .alert').forEach(el => {
+        bootstrap.Alert.getOrCreateInstance(el).close();
+      });
+    }, 4000);
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>
