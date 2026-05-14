@@ -142,12 +142,6 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link {% if 'jefe' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'periodo:lista_jefes' %}">
-              <i class="fas fa-user-tie me-1"></i>Jefes Inmediatos
-            </a>
-          </li>
-          <li class="nav-item">
             <a class="nav-link" href="{% url 'periodo:agregar' %}">
               <i class="fas fa-user-plus me-1"></i>Registrar
             </a>
