@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            {% if ya_enviada %}
+                <div class="alert alert-warning">
+                    <h4>⚠️ Ya enviado</h4>
+                    <p>La alerta al jefe inmediato de <strong>{{ colaborador.nombres }}</strong> ya fue enviada anteriormente.</p>
+                </div>
+            {% elif sin_correo %}
+                <div class="alert alert-danger">
+                    <h4>❌ Sin correo registrado</h4>
+                    <p>El jefe inmediato de <strong>{{ colaborador.nombres }}</strong> no tiene correo registrado en el sistema.</p>
+                </div>
+            {% elif enviado %}
+                <div class="alert alert-success">
+                    <h4>✅ Correo enviado</h4>
+                    <p>Se notificó correctamente al jefe inmediato de <strong>{{ colaborador.nombres }}</strong>.</p>
+                </div>
+            {% else %}
+                <div class="alert alert-danger">
+                    <h4>❌ Error al enviar</h4>
+                    <p>No se pudo enviar el correo. Intente de nuevo más tarde.</p>
+                </div>
+            {% endif %}
+            <a href="/" class="btn btn-secondary mt-3">Volver al inicio</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
