@@ -10,11 +10,6 @@ urlpatterns = [
     path('eliminar/<int:pk>/', views.eliminar_colaborador, name='eliminar'),
     path('evaluacion/<int:pk>/<str:tipo>/', views.marcar_evaluacion, name='marcar_evaluacion'),
     path('plantilla-excel/', views.descargar_plantilla, name='descargar_plantilla'),
-    path('carga-masiva/', views.carga_masiva, name='carga_masiva'),
-
-    # ── Jefes Inmediatos ──────────────────────────────────────
-    path('jefes/', views.lista_jefes, name='lista_jefes'),
-    path('jefes/agregar/', views.agregar_jefe, name='agregar_jefe'),
-    path('jefes/editar/<int:pk>/', views.editar_jefe, name='editar_jefe'),
-    path('jefes/eliminar/<int:pk>/', views.eliminar_jefe, name='eliminar_jefe'),
+    path('importar/', views.importar_excel, name='importar'),
+    path('enviar-jefe/<int:pk>/', views.enviar_alerta_jefe, name='enviar_alerta_jefe'),
 ]
