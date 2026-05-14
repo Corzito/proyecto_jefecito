@@ -401,3 +401,17 @@ def descargar_plantilla(request):
     )
     response["Content-Disposition"] = 'attachment; filename="plantilla_colaboradores.xlsx"'
     return response
+
+from django.views.decorators.http import require_GET
+from django.http import JsonResponse
+from django.core.management import call_command
+
+def ejecutar_alertas(request):
+    token = request.GET.get('token', '')
+    if token != 'incarsa2026seguro':
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    try:
+        call_command('enviar_alertas_periodo')
+        return JsonResponse({'status': 'ok', 'mensaje': 'Alertas procesadas correctamente'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=500)
