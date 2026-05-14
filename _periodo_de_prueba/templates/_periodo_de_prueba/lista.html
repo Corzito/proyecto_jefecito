@@ -49,11 +49,11 @@
             <ol class="mb-0 mt-1 ps-3">
               <li>Descarga la <a href="{% url 'periodo:descargar_plantilla' %}">plantilla oficial</a>.</li>
               <li>Diligencia los datos sin modificar los encabezados.</li>
-              <li>Si el jefe no está registrado, llena la columna <strong>Correo Jefe (opcional)</strong> para crearlo automáticamente.</li>
+              <li>Llena la columna <strong>Correo Jefe (opcional)</strong> para notificaciones.</li>
               <li>Los registros con cédula duplicada serán omitidos.</li>
             </ol>
           </div>
-          <form method="POST" action="{% url 'periodo:carga_masiva' %}" enctype="multipart/form-data">
+          <form method="POST" action="{% url 'periodo:importar' %}" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="mb-3">
               <label for="archivo_excel" class="form-label fw-semibold">
@@ -143,8 +143,8 @@
               <td>{{ item.obj.cargo }}</td>
               <td>
                 {% if item.obj.jefe_inmediato %}
-                  {{ item.obj.jefe_inmediato.nombre }}
-                  {% if not item.obj.jefe_inmediato.correo %}
+                  {{ item.obj.jefe_inmediato }}
+                  {% if not item.obj.correo_jefe %}
                     <span class="badge bg-warning text-dark ms-1" title="Sin correo registrado">
                       <i class="fas fa-exclamation-triangle"></i>
                     </span>
