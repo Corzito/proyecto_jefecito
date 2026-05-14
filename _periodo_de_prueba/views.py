@@ -260,9 +260,144 @@ def importar_excel(request):
 
 
 def descargar_plantilla(request):
-    import os
-    from django.http import FileResponse, Http404
-    ruta = os.path.join(settings.BASE_DIR, 'static', 'plantilla_colaboradores.xlsx')
-    if not os.path.exists(ruta):
-        raise Http404("Plantilla no encontrada.")
-    return FileResponse(open(ruta, 'rb'), as_attachment=True, filename='plantilla_colaboradores.xlsx')
+    import io
+    from django.http import HttpResponse
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Colaboradores"
+
+    rojo       = "E32822"
+    blanco     = "FFFFFF"
+    gris_claro = "F2F2F2"
+
+    header_font  = Font(bold=True, color=blanco, size=11)
+    header_fill  = PatternFill("solid", fgColor=rojo)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border  = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"),  bottom=Side(style="thin"),
+    )
+    data_align = Alignment(horizontal="left", vertical="center")
+
+    columnas = [
+        ("Cédula No",                   20),
+        ("Nombres Completos",            35),
+        ("Cargo",                        35),
+        ("Jefe Inmediato",               28),
+        ("Correo Jefe (opcional)",       30),
+        ("Empresa",                      18),
+        ("No Celular",                   18),
+        ("Fecha Ingreso (AAAA-MM-DD)",   26),
+    ]
+
+    for col_idx, (label, width) in enumerate(columnas, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=label)
+        cell.font      = header_font
+        cell.fill      = header_fill
+        cell.alignment = header_align
+        cell.border    = thin_border
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    ws.row_dimensions[1].height = 32
+
+    data_fill_par   = PatternFill("solid", fgColor=gris_claro)
+    data_fill_impar = PatternFill("solid", fgColor=blanco)
+
+    for row in range(2, 52):
+        fill = data_fill_par if row % 2 == 0 else data_fill_impar
+        for col in range(1, len(columnas) + 1):
+            cell = ws.cell(row=row, column=col, value=None)
+            cell.border    = thin_border
+            cell.fill      = fill
+            cell.alignment = data_align
+        ws.row_dimensions[row].height = 18
+
+    ws.freeze_panes = "A2"
+
+    # Hoja instrucciones
+    wi = wb.create_sheet("📋 Instrucciones")
+    wi.column_dimensions["A"].width = 32
+    wi.column_dimensions["B"].width = 55
+
+    titulo_font = Font(bold=True, color=blanco, size=13)
+    titulo_fill = PatternFill("solid", fgColor=rojo)
+    ok_fill     = PatternFill("solid", fgColor="E2EFDA")
+    ok_font     = Font(color="375623", size=10)
+
+    wi.merge_cells("A1:B1")
+    c = wi.cell(row=1, column=1, value="📋  INSTRUCCIONES DE DILIGENCIAMIENTO")
+    c.font      = titulo_font
+    c.fill      = titulo_fill
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    c.border    = thin_border
+    wi.row_dimensions[1].height = 30
+
+    instrucciones = [
+        ("Cédula No",                  "Número sin puntos ni espacios.",                          "1002368124"),
+        ("Nombres Completos",          "Nombre y apellidos en mayúsculas.",                        "ALDO FLECHAS ALVAREZ"),
+        ("Cargo",                      "Cargo o rol del colaborador.",                             "APRENDIZ SENA"),
+        ("Jefe Inmediato",             "Nombre del jefe inmediato.",                               "ING. JAVIER MOJICA"),
+        ("Correo Jefe (opcional)",     "Correo del jefe para notificaciones.",                     "javier.mojica@empresa.com"),
+        ("Empresa",                    "CARBOINSA | INCARSA | UNIMINAS | MILPA",                   "INCARSA"),
+        ("No Celular",                 "Sin espacios ni guiones.",                                 "3137774696"),
+        ("Fecha Ingreso (AAAA-MM-DD)", "Formato AÑO-MES-DÍA.",                                    "2025-01-10"),
+    ]
+
+    fila_act = 2
+    for campo, desc, ejemplo_val in instrucciones:
+        c = wi.cell(row=fila_act, column=1, value=campo)
+        c.font      = Font(size=10, bold=True)
+        c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        c.border    = thin_border
+        wi.row_dimensions[fila_act].height = 36
+
+        c = wi.cell(row=fila_act, column=2, value=desc)
+        c.font      = Font(size=10)
+        c.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        c.border    = thin_border
+
+        fila_act += 1
+        c = wi.cell(row=fila_act, column=1, value="Ejemplo →")
+        c.font = ok_font; c.fill = ok_fill
+        c.alignment = Alignment(horizontal="left", vertical="center")
+        c.border = thin_border
+
+        c = wi.cell(row=fila_act, column=2, value=ejemplo_val)
+        c.font = ok_font; c.fill = ok_fill
+        c.alignment = Alignment(horizontal="left", vertical="center")
+        c.border = thin_border
+        wi.row_dimensions[fila_act].height = 18
+        fila_act += 1
+
+    # Hoja empresas
+    we = wb.create_sheet("Empresas válidas")
+    we.column_dimensions["A"].width = 35
+    c = we.cell(row=1, column=1, value="Valores aceptados en la columna EMPRESA")
+    c.font      = Font(bold=True, color=blanco, size=11)
+    c.fill      = PatternFill("solid", fgColor=rojo)
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    c.border    = thin_border
+    we.row_dimensions[1].height = 28
+    for i, emp in enumerate(["CARBOINSA", "INCARSA", "UNIMINAS", "MILPA"], start=2):
+        c = we.cell(row=i, column=1, value=emp)
+        c.font      = Font(size=11, bold=True)
+        c.fill      = PatternFill("solid", fgColor="E2EFDA")
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border    = thin_border
+        we.row_dimensions[i].height = 22
+
+    wb.active = ws
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(
+        buffer,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="plantilla_colaboradores.xlsx"'
+    return response
