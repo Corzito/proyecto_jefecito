@@ -12,5 +12,6 @@ urlpatterns = [
     path('plantilla-excel/', views.descargar_plantilla, name='descargar_plantilla'),
     path('importar/', views.importar_excel, name='importar'),
     path('enviar-jefe/<int:pk>/', views.enviar_alerta_jefe, name='enviar_alerta_jefe'),
+    path('enviar-jefes-masivo/', views.enviar_jefes_masivo, name='enviar_jefes_masivo'),
     path('ejecutar-alertas/', views.ejecutar_alertas, name='ejecutar_alertas'),
 ]

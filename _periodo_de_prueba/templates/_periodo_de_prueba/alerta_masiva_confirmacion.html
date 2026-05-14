@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            {% if error_token %}
+                <div class="alert alert-danger">
+                    <h4>❌ No autorizado</h4>
+                    <p>El enlace no es válido.</p>
+                </div>
+            {% else %}
+                <div class="alert alert-success">
+                    <h4>✅ Envío masivo completado</h4>
+                    <p><strong>{{ enviados }}</strong> correo(s) enviado(s) a jefes inmediatos.</p>
+                </div>
+                {% if sin_correo %}
+                <div class="alert alert-warning">
+                    <h6>⚠️ Sin correo registrado:</h6>
+                    <ul class="mb-0">
+                        {% for nombre in sin_correo %}
+                        <li>{{ nombre }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if errores %}
+                <div class="alert alert-danger">
+                    <h6>❌ Errores:</h6>
+                    <ul class="mb-0">
+                        {% for err in errores %}
+                        <li>{{ err }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            {% endif %}
+            <a href="/" class="btn btn-secondary mt-3">Volver al inicio</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

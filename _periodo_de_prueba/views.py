@@ -6,6 +6,8 @@ from django.utils import timezone
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.views.decorators.http import require_GET
+from django.http import JsonResponse
+from django.core.management import call_command
 from .models import Colaborador
 from .forms import ColaboradorForm
 
@@ -97,20 +99,17 @@ def enviar_alerta_jefe(request, pk):
             'sin_correo': True,
         })
 
-    asunto = (
-        f'⚠️ EVALUACIÓN PERIODO DE PRUEBA - {colaborador.nombres} '
-        f'| Evaluación 30 días próximamente'
-    )
+    asunto = f'⚠️ EVALUACIÓN PERIODO DE PRUEBA - {colaborador.nombres} | Evaluación próximamente'
     mensaje_html = f"""
 <!DOCTYPE html>
 <html>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <div style="background-color: #E32822; padding: 20px; text-align: center;">
-        <h2 style="color: white; margin: 0;">⚠️ EVALUACIÓN PERIODO DE PRUEBA</h2>
+<body style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto;">
+    <div style="background-color:#E32822; padding:20px; text-align:center;">
+        <h2 style="color:white; margin:0;">⚠️ EVALUACIÓN PERIODO DE PRUEBA</h2>
     </div>
-    <div style="padding: 20px; background-color: #f9f9f9;">
+    <div style="padding:20px; background-color:#f9f9f9;">
         <p>Estimado/a <strong>{colaborador.jefe_inmediato}</strong>,</p>
-        <p>Le informamos que el siguiente colaborador a su cargo requiere evaluación de seguimiento:</p>
+        <p>Le informamos que el siguiente colaborador a su cargo requiere evaluación:</p>
         <table style="width:100%; border-collapse:collapse; margin:15px 0;">
             <tr style="background:#fff;">
                 <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Nombre</td>
@@ -137,7 +136,7 @@ def enviar_alerta_jefe(request, pk):
                 <td style="padding:8px; border:1px solid #ddd;">{colaborador.fecha_ingreso.strftime('%d/%m/%Y')}</td>
             </tr>
         </table>
-        <p>Por favor coordinar y realizar la evaluación de 30 días en los próximos 7 días.</p>
+        <p>Por favor coordinar la evaluación en los próximos 7 días.</p>
     </div>
     <div style="background-color:#333; padding:10px; text-align:center;">
         <p style="color:#aaa; font-size:11px; margin:0;">Sistema de Seguimiento - Periodo de Prueba</p>
@@ -149,7 +148,7 @@ def enviar_alerta_jefe(request, pk):
     try:
         email = EmailMultiAlternatives(
             subject=asunto,
-            body=f"Evaluación pendiente para {colaborador.nombres}. Abra en HTML para ver el detalle.",
+            body=f"Evaluación pendiente para {colaborador.nombres}.",
             from_email=settings.EMAIL_HOST_USER,
             to=[colaborador.correo_jefe],
         )
@@ -164,6 +163,106 @@ def enviar_alerta_jefe(request, pk):
     return render(request, '_periodo_de_prueba/alerta_jefe_confirmacion.html', {
         'colaborador': colaborador,
         'enviado': enviado,
+    })
+
+
+def enviar_jefes_masivo(request):
+    token = request.GET.get('token', '')
+    if token != 'incarsa2026seguro':
+        return render(request, '_periodo_de_prueba/alerta_jefe_confirmacion.html', {
+            'error_token': True,
+        })
+
+    ids_30 = [i for i in request.GET.get('ids_30', '').split(',') if i]
+    ids_50 = [i for i in request.GET.get('ids_50', '').split(',') if i]
+
+    enviados = 0
+    sin_correo = []
+    errores = []
+
+    def enviar_a_jefe(colaborador, tipo_evaluacion):
+        nonlocal enviados
+        if not colaborador.correo_jefe:
+            sin_correo.append(colaborador.nombres)
+            return
+        asunto = f'⚠️ EVALUACIÓN PERIODO DE PRUEBA - {colaborador.nombres} | Evaluación {tipo_evaluacion} días'
+        mensaje_html = f"""
+<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto;">
+    <div style="background-color:#E32822; padding:20px; text-align:center;">
+        <h2 style="color:white; margin:0;">⚠️ EVALUACIÓN PERIODO DE PRUEBA</h2>
+    </div>
+    <div style="padding:20px; background-color:#f9f9f9;">
+        <p>Estimado/a <strong>{colaborador.jefe_inmediato}</strong>,</p>
+        <p>Le informamos que el siguiente colaborador requiere evaluación de <strong>{tipo_evaluacion} días</strong>:</p>
+        <table style="width:100%; border-collapse:collapse; margin:15px 0;">
+            <tr style="background:#fff;">
+                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Nombre</td>
+                <td style="padding:8px; border:1px solid #ddd;">{colaborador.nombres}</td>
+            </tr>
+            <tr style="background:#f2f2f2;">
+                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Cédula</td>
+                <td style="padding:8px; border:1px solid #ddd;">{colaborador.cedula}</td>
+            </tr>
+            <tr style="background:#fff;">
+                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Cargo</td>
+                <td style="padding:8px; border:1px solid #ddd;">{colaborador.cargo}</td>
+            </tr>
+            <tr style="background:#f2f2f2;">
+                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Empresa</td>
+                <td style="padding:8px; border:1px solid #ddd;">{colaborador.get_empresa_display()}</td>
+            </tr>
+            <tr style="background:#fff;">
+                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Fecha Ingreso</td>
+                <td style="padding:8px; border:1px solid #ddd;">{colaborador.fecha_ingreso.strftime('%d/%m/%Y')}</td>
+            </tr>
+            <tr style="background:#f2f2f2;">
+                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Días en empresa</td>
+                <td style="padding:8px; border:1px solid #ddd;">{colaborador.dias_en_empresa()} días</td>
+            </tr>
+        </table>
+        <p>Por favor coordinar la evaluación en los próximos 7 días.</p>
+    </div>
+    <div style="background-color:#333; padding:10px; text-align:center;">
+        <p style="color:#aaa; font-size:11px; margin:0;">Sistema de Seguimiento - Periodo de Prueba</p>
+    </div>
+</body>
+</html>
+        """.strip()
+        try:
+            email = EmailMultiAlternatives(
+                subject=asunto,
+                body=f"Evaluación pendiente para {colaborador.nombres}.",
+                from_email=settings.EMAIL_HOST_USER,
+                to=[colaborador.correo_jefe],
+            )
+            email.attach_alternative(mensaje_html, "text/html")
+            email.send(fail_silently=False)
+            colaborador.alerta_jefe_enviada = True
+            colaborador.save(update_fields=['alerta_jefe_enviada'])
+            enviados += 1
+        except Exception as e:
+            errores.append(f'{colaborador.nombres}: {str(e)}')
+
+    for pk in ids_30:
+        try:
+            col = Colaborador.objects.get(pk=pk)
+            enviar_a_jefe(col, 30)
+        except Colaborador.DoesNotExist:
+            pass
+
+    for pk in ids_50:
+        try:
+            col = Colaborador.objects.get(pk=pk)
+            enviar_a_jefe(col, 50)
+        except Colaborador.DoesNotExist:
+            pass
+
+    return render(request, '_periodo_de_prueba/alerta_masiva_confirmacion.html', {
+        'enviados': enviados,
+        'sin_correo': sin_correo,
+        'errores': errores,
     })
 
 
@@ -191,12 +290,12 @@ def importar_excel(request):
             if not row[1]:
                 continue
             try:
-                cedula    = str(row[1]).strip().replace('.', '').replace(',', '').split('.')[0]
-                nombres   = str(row[2]).strip().upper() if row[2] else ''
-                cargo     = str(row[3]).strip().upper() if row[3] else ''
-                jefe      = str(row[4]).strip().upper() if row[4] else ''
-                fecha_raw = row[7]
-                celular   = str(row[6]).strip() if row[6] else ''
+                cedula      = str(row[1]).strip().replace('.', '').replace(',', '').split('.')[0]
+                nombres     = str(row[2]).strip().upper() if row[2] else ''
+                cargo       = str(row[3]).strip().upper() if row[3] else ''
+                jefe        = str(row[4]).strip().upper() if row[4] else ''
+                fecha_raw   = row[7]
+                celular     = str(row[6]).strip() if row[6] else ''
                 empresa_raw = str(row[5]).strip().upper() if row[5] else ''
                 empresa = (empresa_raw
                            .replace(' S.A.S.', '').replace(' S.A.S', '')
@@ -318,7 +417,6 @@ def descargar_plantilla(request):
 
     ws.freeze_panes = "A2"
 
-    # Hoja instrucciones
     wi = wb.create_sheet("📋 Instrucciones")
     wi.column_dimensions["A"].width = 32
     wi.column_dimensions["B"].width = 55
@@ -337,14 +435,14 @@ def descargar_plantilla(request):
     wi.row_dimensions[1].height = 30
 
     instrucciones = [
-        ("Cédula No",                  "Número sin puntos ni espacios.",                          "1002368124"),
-        ("Nombres Completos",          "Nombre y apellidos en mayúsculas.",                        "ALDO FLECHAS ALVAREZ"),
-        ("Cargo",                      "Cargo o rol del colaborador.",                             "APRENDIZ SENA"),
-        ("Jefe Inmediato",             "Nombre del jefe inmediato.",                               "ING. JAVIER MOJICA"),
-        ("Correo Jefe (opcional)",     "Correo del jefe para notificaciones.",                     "javier.mojica@empresa.com"),
-        ("Empresa",                    "CARBOINSA | INCARSA | UNIMINAS | MILPA",                   "INCARSA"),
-        ("No Celular",                 "Sin espacios ni guiones.",                                 "3137774696"),
-        ("Fecha Ingreso (AAAA-MM-DD)", "Formato AÑO-MES-DÍA.",                                    "2025-01-10"),
+        ("Cédula No",                  "Número sin puntos ni espacios.",          "1002368124"),
+        ("Nombres Completos",          "Nombre y apellidos en mayúsculas.",        "ALDO FLECHAS ALVAREZ"),
+        ("Cargo",                      "Cargo o rol del colaborador.",             "APRENDIZ SENA"),
+        ("Jefe Inmediato",             "Nombre del jefe inmediato.",               "ING. JAVIER MOJICA"),
+        ("Correo Jefe (opcional)",     "Correo del jefe para notificaciones.",     "javier.mojica@empresa.com"),
+        ("Empresa",                    "CARBOINSA | INCARSA | UNIMINAS | MILPA",   "INCARSA"),
+        ("No Celular",                 "Sin espacios ni guiones.",                 "3137774696"),
+        ("Fecha Ingreso (AAAA-MM-DD)", "Formato AÑO-MES-DÍA.",                    "2025-01-10"),
     ]
 
     fila_act = 2
@@ -373,7 +471,6 @@ def descargar_plantilla(request):
         wi.row_dimensions[fila_act].height = 18
         fila_act += 1
 
-    # Hoja empresas
     we = wb.create_sheet("Empresas válidas")
     we.column_dimensions["A"].width = 35
     c = we.cell(row=1, column=1, value="Valores aceptados en la columna EMPRESA")
@@ -402,9 +499,6 @@ def descargar_plantilla(request):
     response["Content-Disposition"] = 'attachment; filename="plantilla_colaboradores.xlsx"'
     return response
 
-from django.views.decorators.http import require_GET
-from django.http import JsonResponse
-from django.core.management import call_command
 
 def ejecutar_alertas(request):
     token = request.GET.get('token', '')
