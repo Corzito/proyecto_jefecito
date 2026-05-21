@@ -77,10 +77,6 @@ class Command(BaseCommand):
         """
 
     def _enviar_correo_agrupado(self, alerta_30, alerta_50):
-        ids_30 = ','.join(str(c.pk) for c in alerta_30)
-        ids_50 = ','.join(str(c.pk) for c in alerta_50)
-        url_boton = f"{BASE_URL}/periodo-prueba/enviar-jefes-masivo/?ids_30={ids_30}&ids_50={ids_50}&token=incarsa2026seguro"
-
         seccion_30 = ''
         if alerta_30:
             seccion_30 = f"""
@@ -120,16 +116,8 @@ class Command(BaseCommand):
     <div style="padding:25px; background-color:#f9f9f9;">
         {seccion_30}
         {seccion_50}
-        <div style="text-align:center; margin:30px 0;">
-            <a href="{url_boton}"
-               style="background-color:#E32822; color:white; padding:16px 32px;
-                      text-decoration:none; border-radius:5px; font-size:16px;
-                      font-weight:bold; display:inline-block;">
-                📧 Enviar Alertas a Todos los Jefes Inmediatos
-            </a>
-        </div>
         <p style="color:#666; font-size:12px; text-align:center;">
-            Al hacer click se enviará automáticamente un correo a cada jefe inmediato listado.
+            Por favor coordinar con los jefes inmediatos para programar las evaluaciones.
         </p>
     </div>
     <div style="background-color:#333; padding:10px; text-align:center;">
@@ -145,7 +133,7 @@ class Command(BaseCommand):
             email = EmailMultiAlternatives(
                 subject=asunto,
                 body="Alertas periodo de prueba. Abra en HTML para ver el detalle.",
-                from_email='onboarding@resend.dev',
+                from_email=settings.EMAIL_HOST_USER,
                 to=[CORREO_CRISTIAN],
             )
             email.attach_alternative(mensaje_html, "text/html")
