@@ -12,6 +12,4 @@ urlpatterns = [
     path('plantilla-excel/', views.descargar_plantilla, name='descargar_plantilla'),
     path('importar/', views.importar_excel, name='importar'),
     path('ejecutar-alertas/', views.ejecutar_alertas, name='ejecutar_alertas'),
-    path('jefes/', views.lista_jefes, name='lista_jefes'),
-    path('jefes/editar/', views.editar_correo_jefe, name='editar_correo_jefe'),
 ]
