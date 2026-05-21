@@ -9,105 +9,133 @@ BASE_URL = 'https://proyecto-jefecito.onrender.com'
 
 
 class Command(BaseCommand):
-    help = 'Envía alertas por correo cuando faltan 7 días para evaluaciones de periodo de prueba'
+    help = 'Envía alertas agrupadas por correo cuando faltan 7 días para evaluaciones'
 
     def handle(self, *args, **kwargs):
         hoy = timezone.now().date()
         colaboradores = Colaborador.objects.all()
-        enviados_30 = 0
-        enviados_50 = 0
+
+        alerta_30 = []
+        alerta_50 = []
 
         for col in colaboradores:
             dias = (hoy - col.fecha_ingreso).days
 
             if dias == 23 and not col.alerta_30_enviada:
-                self._enviar_correo_cristian(col)
+                alerta_30.append(col)
                 col.alerta_30_enviada = True
                 col.save(update_fields=['alerta_30_enviada'])
-                enviados_30 += 1
                 self.stdout.write(self.style.WARNING(
-                    f'[ALERTA 30] {col.nombres} - {col.empresa} - faltan 7 días'
+                    f'[ALERTA 30] {col.nombres} - {col.empresa}'
                 ))
 
             if dias == 43 and not col.alerta_50_enviada:
-                self._enviar_correo_alerta(col, 50, 7)
+                alerta_50.append(col)
                 col.alerta_50_enviada = True
                 col.save(update_fields=['alerta_50_enviada'])
-                enviados_50 += 1
                 self.stdout.write(self.style.WARNING(
-                    f'[ALERTA 50] {col.nombres} - {col.empresa} - faltan 7 días'
+                    f'[ALERTA 50] {col.nombres} - {col.empresa}'
                 ))
 
+        if alerta_30 or alerta_50:
+            self._enviar_correo_agrupado(alerta_30, alerta_50)
+
         self.stdout.write(self.style.SUCCESS(
-            f'Proceso completado. Alertas 30 días: {enviados_30} | Alertas 50 días: {enviados_50}'
+            f'Proceso completado. Alertas 30 días: {len(alerta_30)} | Alertas 50 días: {len(alerta_50)}'
         ))
 
-    def _enviar_correo_cristian(self, colaborador):
-        url_boton = f"{BASE_URL}/periodo/enviar-jefe/{colaborador.pk}/"
-        correo_jefe = colaborador.correo_jefe or 'Sin correo registrado'
+    def _build_tabla(self, colaboradores):
+        filas = ''
+        for i, col in enumerate(colaboradores):
+            bg = '#ffffff' if i % 2 == 0 else '#f2f2f2'
+            filas += f"""
+            <tr style="background:{bg};">
+                <td style="padding:8px; border:1px solid #ddd;">{col.nombres}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{col.cedula}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{col.cargo}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{col.get_empresa_display()}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{col.jefe_inmediato}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{col.fecha_ingreso.strftime('%d/%m/%Y')}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{col.dias_en_empresa()} días</td>
+            </tr>
+            """
+        return f"""
+        <table style="width:100%; border-collapse:collapse; margin:15px 0;">
+            <thead>
+                <tr style="background:#E32822; color:white;">
+                    <th style="padding:8px; border:1px solid #ddd;">Nombre</th>
+                    <th style="padding:8px; border:1px solid #ddd;">Cédula</th>
+                    <th style="padding:8px; border:1px solid #ddd;">Cargo</th>
+                    <th style="padding:8px; border:1px solid #ddd;">Empresa</th>
+                    <th style="padding:8px; border:1px solid #ddd;">Jefe Inmediato</th>
+                    <th style="padding:8px; border:1px solid #ddd;">F. Ingreso</th>
+                    <th style="padding:8px; border:1px solid #ddd;">Días</th>
+                </tr>
+            </thead>
+            <tbody>{filas}</tbody>
+        </table>
+        """
 
-        asunto = (
-            f'⚠️ ALERTA PERIODO DE PRUEBA - {colaborador.nombres} '
-            f'| Evaluación 30 días en 7 días'
-        )
+    def _enviar_correo_agrupado(self, alerta_30, alerta_50):
+        ids_30 = ','.join(str(c.pk) for c in alerta_30)
+        ids_50 = ','.join(str(c.pk) for c in alerta_50)
+        url_boton = f"{BASE_URL}/periodo-prueba/enviar-jefes-masivo/?ids_30={ids_30}&ids_50={ids_50}&token=incarsa2026seguro"
+
+        seccion_30 = ''
+        if alerta_30:
+            seccion_30 = f"""
+            <div style="margin-bottom:30px;">
+                <h3 style="color:#E32822; border-bottom:2px solid #E32822; padding-bottom:5px;">
+                    ⚠️ Evaluación de 30 días — {len(alerta_30)} colaborador(es)
+                </h3>
+                <p>Faltan 7 días para la evaluación de 30 días de los siguientes colaboradores:</p>
+                {self._build_tabla(alerta_30)}
+            </div>
+            """
+
+        seccion_50 = ''
+        if alerta_50:
+            seccion_50 = f"""
+            <div style="margin-bottom:30px;">
+                <h3 style="color:#e6a817; border-bottom:2px solid #e6a817; padding-bottom:5px;">
+                    ⚠️ Evaluación de 50 días — {len(alerta_50)} colaborador(es)
+                </h3>
+                <p>Faltan 7 días para la evaluación de 50 días de los siguientes colaboradores:</p>
+                {self._build_tabla(alerta_50)}
+            </div>
+            """
+
+        asunto = f'⚠️ ALERTAS PERIODO DE PRUEBA — {len(alerta_30)} alerta(s) 30d | {len(alerta_50)} alerta(s) 50d'
+
         mensaje_html = f"""
 <!DOCTYPE html>
 <html>
-<body style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto;">
+<body style="font-family:Arial,sans-serif; max-width:800px; margin:0 auto;">
     <div style="background-color:#E32822; padding:20px; text-align:center;">
-        <h2 style="color:white; margin:0;">⚠️ ALERTA PERIODO DE PRUEBA</h2>
+        <h2 style="color:white; margin:0;">⚠️ ALERTAS PERIODO DE PRUEBA</h2>
+        <p style="color:rgba(255,255,255,0.9); margin:5px 0 0 0;">
+            {timezone.now().strftime('%d/%m/%Y')}
+        </p>
     </div>
-    <div style="padding:20px; background-color:#f9f9f9;">
-        <p>Se requiere evaluación de seguimiento para el siguiente colaborador:</p>
-        <table style="width:100%; border-collapse:collapse; margin:15px 0;">
-            <tr style="background:#fff;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Nombre</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.nombres}</td>
-            </tr>
-            <tr style="background:#f2f2f2;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Cédula</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.cedula}</td>
-            </tr>
-            <tr style="background:#fff;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Cargo</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.cargo}</td>
-            </tr>
-            <tr style="background:#f2f2f2;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Empresa</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.get_empresa_display()}</td>
-            </tr>
-            <tr style="background:#fff;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Jefe Inmediato</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.jefe_inmediato}</td>
-            </tr>
-            <tr style="background:#f2f2f2;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Celular</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.celular}</td>
-            </tr>
-            <tr style="background:#fff;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Fecha Ingreso</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.fecha_ingreso.strftime('%d/%m/%Y')}</td>
-            </tr>
-            <tr style="background:#f2f2f2;">
-                <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Días en empresa</td>
-                <td style="padding:8px; border:1px solid #ddd;">{colaborador.dias_en_empresa()} días (faltan 7 para evaluación)</td>
-            </tr>
-        </table>
-        <div style="text-align:center; margin:25px 0;">
+    <div style="padding:25px; background-color:#f9f9f9;">
+        {seccion_30}
+        {seccion_50}
+        <div style="text-align:center; margin:30px 0;">
             <a href="{url_boton}"
-               style="background-color:#E32822; color:white; padding:14px 28px;
+               style="background-color:#E32822; color:white; padding:16px 32px;
                       text-decoration:none; border-radius:5px; font-size:16px;
                       font-weight:bold; display:inline-block;">
-                📧 Enviar Alerta a Jefe Inmediato
+                📧 Enviar Alertas a Todos los Jefes Inmediatos
             </a>
         </div>
         <p style="color:#666; font-size:12px; text-align:center;">
-            Al hacer click se enviará automáticamente un correo a:
-            <strong>{correo_jefe}</strong>
+            Al hacer click se enviará automáticamente un correo a cada jefe inmediato listado.
         </p>
     </div>
     <div style="background-color:#333; padding:10px; text-align:center;">
-        <p style="color:#aaa; font-size:11px; margin:0;">Sistema de Seguimiento - Periodo de Prueba</p>
+        <p style="color:#aaa; font-size:11px; margin:0;">
+            Sistema de Seguimiento - Periodo de Prueba
+        </p>
     </div>
 </body>
 </html>
@@ -116,46 +144,12 @@ class Command(BaseCommand):
         try:
             email = EmailMultiAlternatives(
                 subject=asunto,
-                body=f"Alerta periodo de prueba: {colaborador.nombres}. Abra en HTML para ver el botón.",
+                body="Alertas periodo de prueba. Abra en HTML para ver el detalle.",
                 from_email=settings.EMAIL_HOST_USER,
                 to=[CORREO_CRISTIAN],
             )
             email.attach_alternative(mensaje_html, "text/html")
             email.send(fail_silently=False)
+            self.stdout.write(self.style.SUCCESS('Correo agrupado enviado a Cristian.'))
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Error enviando correo para {colaborador.nombres}: {e}'))
-
-    def _enviar_correo_alerta(self, colaborador, dias_evaluacion, dias_restantes):
-        asunto = (
-            f'⚠️ ALERTA PERIODO DE PRUEBA - {colaborador.nombres} '
-            f'| Evaluación {dias_evaluacion} días en {dias_restantes} días'
-        )
-        mensaje = f"""
-SISTEMA DE SEGUIMIENTO - PERIODO DE PRUEBA
-{'='*50}
-
-   • Nombre:         {colaborador.nombres}
-   • Cédula:         {colaborador.cedula}
-   • Cargo:          {colaborador.cargo}
-   • Empresa:        {colaborador.get_empresa_display()}
-   • Jefe Inmediato: {colaborador.jefe_inmediato}
-   • Celular:        {colaborador.celular}
-   • Fecha Ingreso:  {colaborador.fecha_ingreso.strftime('%d/%m/%Y')}
-
-   • Tipo:           Evaluación de {dias_evaluacion} días
-   • Días restantes: {dias_restantes} días
-
-{'='*50}
-        """.strip()
-
-        try:
-            from django.core.mail import send_mail
-            send_mail(
-                subject=asunto,
-                message=mensaje,
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[CORREO_CRISTIAN],
-                fail_silently=False,
-            )
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Error enviando correo para {colaborador.nombres}: {e}'))
+            self.stdout.write(self.style.ERROR(f'Error enviando correo: {e}'))
