@@ -14,4 +14,6 @@ urlpatterns = [
     path('enviar-jefe/<int:pk>/', views.enviar_alerta_jefe, name='enviar_alerta_jefe'),
     path('enviar-jefes-masivo/', views.enviar_jefes_masivo, name='enviar_jefes_masivo'),
     path('ejecutar-alertas/', views.ejecutar_alertas, name='ejecutar_alertas'),
+    path('jefes/', views.lista_jefes, name='lista_jefes'),
+    path('jefes/editar/', views.editar_correo_jefe, name='editar_correo_jefe'),
 ]

@@ -498,6 +498,25 @@ def descargar_plantilla(request):
     response["Content-Disposition"] = 'attachment; filename="plantilla_colaboradores.xlsx"'
     return response
 
+def lista_jefes(request):
+    jefes = Colaborador.objects.values('jefe_inmediato', 'correo_jefe').distinct().order_by('jefe_inmediato')
+    return render(request, '_periodo_de_prueba/jefes/lista.html', {'jefes': jefes})
+
+
+def editar_correo_jefe(request):
+    nombre_jefe = request.GET.get('nombre', '')
+    if request.method == 'POST':
+        nombre_jefe = request.POST.get('nombre_jefe', '')
+        correo_nuevo = request.POST.get('correo_jefe', '')
+        Colaborador.objects.filter(jefe_inmediato=nombre_jefe).update(correo_jefe=correo_nuevo)
+        messages.success(request, f'Correo de {nombre_jefe} actualizado correctamente.')
+        return redirect('periodo:lista_jefes')
+    return render(request, '_periodo_de_prueba/jefes/editar.html', {
+        'nombre_jefe': nombre_jefe,
+        'correo_actual': Colaborador.objects.filter(
+            jefe_inmediato=nombre_jefe
+        ).values_list('correo_jefe', flat=True).first() or '',
+    })
 
 def ejecutar_alertas(request):
     token = request.GET.get('token', '')
