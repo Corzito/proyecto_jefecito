@@ -1,5 +1,4 @@
 import openpyxl
-import threading
 from datetime import datetime
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -240,28 +239,36 @@ def enviar_jefes_masivo(request):
     ids_30 = [i for i in request.GET.get('ids_30', '').split(',') if i]
     ids_50 = [i for i in request.GET.get('ids_50', '').split(',') if i]
 
-    def enviar():
-        for pk in ids_30:
-            try:
-                col = Colaborador.objects.get(pk=pk)
-                _enviar_correo_jefe(col, 30)
-            except Exception:
-                pass
-        for pk in ids_50:
-            try:
-                col = Colaborador.objects.get(pk=pk)
-                _enviar_correo_jefe(col, 50)
-            except Exception:
-                pass
+    enviados = 0
+    sin_correo = []
+    errores = []
 
-    t = threading.Thread(target=enviar)
-    t.daemon = True
-    t.start()
+    for pk in ids_30:
+        try:
+            col = Colaborador.objects.get(pk=pk)
+            if col.correo_jefe:
+                _enviar_correo_jefe(col, 30)
+                enviados += 1
+            else:
+                sin_correo.append(col.nombres)
+        except Exception as e:
+            errores.append(str(e))
+
+    for pk in ids_50:
+        try:
+            col = Colaborador.objects.get(pk=pk)
+            if col.correo_jefe:
+                _enviar_correo_jefe(col, 50)
+                enviados += 1
+            else:
+                sin_correo.append(col.nombres)
+        except Exception as e:
+            errores.append(str(e))
 
     return render(request, '_periodo_de_prueba/alerta_masiva_confirmacion.html', {
-        'enviados': len(ids_30) + len(ids_50),
-        'sin_correo': [],
-        'errores': [],
+        'enviados': enviados,
+        'sin_correo': sin_correo,
+        'errores': errores,
     })
 
 
@@ -498,6 +505,7 @@ def descargar_plantilla(request):
     response["Content-Disposition"] = 'attachment; filename="plantilla_colaboradores.xlsx"'
     return response
 
+
 def lista_jefes(request):
     jefes = Colaborador.objects.values('jefe_inmediato', 'correo_jefe').distinct().order_by('jefe_inmediato')
     return render(request, '_periodo_de_prueba/jefes/lista.html', {'jefes': jefes})
@@ -517,6 +525,7 @@ def editar_correo_jefe(request):
             jefe_inmediato=nombre_jefe
         ).values_list('correo_jefe', flat=True).first() or '',
     })
+
 
 def ejecutar_alertas(request):
     token = request.GET.get('token', '')
