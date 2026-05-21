@@ -87,91 +87,115 @@ def importar_excel(request):
         archivo = request.FILES.get('archivo_excel')
         if not archivo:
             messages.error(request, 'Selecciona un archivo Excel.')
-            return redirect('periodo:importar')
+            return redirect('periodo:lista')
         if not archivo.name.endswith('.xlsx'):
             messages.error(request, 'El archivo debe ser .xlsx')
-            return redirect('periodo:importar')
+            return redirect('periodo:lista')
         try:
             wb = openpyxl.load_workbook(archivo)
-            ws = wb['COLABORADORES']
+            ws = wb.active
         except Exception:
-            messages.error(request, 'No se pudo leer el archivo. Asegúrate de usar la plantilla original.')
-            return redirect('periodo:importar')
+            messages.error(request, 'No se pudo leer el archivo.')
+            return redirect('periodo:lista')
 
         exitosos = 0
         errores = []
         duplicados = 0
 
-        for fila_num, row in enumerate(ws.iter_rows(min_row=5, values_only=True), start=5):
-            if not row[1]:
+        encabezados = {}
+        for cell in ws[1]:
+            if cell.value:
+                encabezados[str(cell.value).upper().strip()] = cell.column - 1
+
+        mapa = {
+            "CÉDULA NO": "cedula", "CEDULA NO": "cedula", "CEDULA": "cedula",
+            "NOMBRES COMPLETOS": "nombres", "NOMBRES": "nombres",
+            "CARGO": "cargo",
+            "JEFE INMEDIATO": "jefe_inmediato",
+            "EMPRESA": "empresa",
+            "NO CELULAR": "celular", "CELULAR": "celular",
+            "FECHA INGRESO (AAAA-MM-DD)": "fecha_ingreso", "FECHA INGRESO": "fecha_ingreso",
+        }
+
+        indices = {}
+        for enc_label, campo in mapa.items():
+            if enc_label in encabezados and campo not in indices:
+                indices[campo] = encabezados[enc_label]
+
+        campos_requeridos = ["cedula", "nombres", "cargo", "jefe_inmediato", "empresa", "celular", "fecha_ingreso"]
+        faltantes = [c for c in campos_requeridos if c not in indices]
+        if faltantes:
+            messages.error(request, f"Columnas faltantes: {', '.join(faltantes)}. Usa la plantilla oficial.")
+            return redirect('periodo:lista')
+
+        EMPRESAS_VALIDAS = {"CARBOINSA", "INCARSA", "UNIMINAS", "MILPA"}
+
+        for fila_num, fila in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if all(v is None or str(v).strip() == "" for v in fila):
                 continue
+
+            def get(campo):
+                idx = indices.get(campo)
+                if idx is None:
+                    return ""
+                val = fila[idx]
+                return str(val).strip() if val is not None else ""
+
+            cedula      = get("cedula")
+            nombres     = get("nombres")
+            cargo       = get("cargo")
+            jefe        = get("jefe_inmediato")
+            empresa     = get("empresa").upper()
+            celular     = get("celular")
+            fecha_str   = get("fecha_ingreso")
+
+            if not cedula or not nombres:
+                errores.append(f'Fila {fila_num}: cédula o nombre vacío.')
+                duplicados += 1
+                continue
+
+            if empresa not in EMPRESAS_VALIDAS:
+                errores.append(f'Fila {fila_num} ({nombres}): empresa "{empresa}" no válida.')
+                duplicados += 1
+                continue
+
             try:
-                cedula      = str(row[1]).strip().replace('.', '').replace(',', '').split('.')[0]
-                nombres     = str(row[2]).strip().upper() if row[2] else ''
-                cargo       = str(row[3]).strip().upper() if row[3] else ''
-                jefe        = str(row[4]).strip().upper() if row[4] else ''
-                fecha_raw   = row[7]
-                celular     = str(row[6]).strip() if row[6] else ''
-                empresa_raw = str(row[5]).strip().upper() if row[5] else ''
-                empresa = (empresa_raw
-                           .replace(' S.A.S.', '').replace(' S.A.S', '')
-                           .replace(' SAS', '').strip())
-
-                if not all([cedula, nombres, cargo, jefe, empresa, celular, fecha_raw]):
-                    errores.append(f'Fila {fila_num}: campos incompletos.')
-                    continue
-
-                if empresa not in ['CARBOINSA', 'INCARSA', 'UNIMINAS', 'MILPA']:
-                    errores.append(f'Fila {fila_num}: empresa "{empresa_raw}" no válida.')
-                    continue
-
-                if isinstance(fecha_raw, datetime):
-                    fecha_ingreso = fecha_raw.date()
-                elif isinstance(fecha_raw, str):
-                    fecha_ingreso = None
-                    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d/%m/%y'):
-                        try:
-                            fecha_ingreso = datetime.strptime(fecha_raw.strip(), fmt).date()
-                            break
-                        except ValueError:
-                            continue
-                    if not fecha_ingreso:
-                        errores.append(f'Fila {fila_num}: fecha "{fecha_raw}" no válida.')
-                        continue
+                val_fecha = fila[indices["fecha_ingreso"]]
+                from datetime import date
+                if isinstance(val_fecha, date):
+                    fecha_ingreso = val_fecha
                 else:
-                    errores.append(f'Fila {fila_num}: formato de fecha no reconocido.')
-                    continue
+                    fecha_ingreso = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                errores.append(f'Fila {fila_num} ({nombres}): fecha "{fecha_str}" inválida.')
+                duplicados += 1
+                continue
 
-                if Colaborador.objects.filter(cedula=cedula).exists():
-                    duplicados += 1
-                    continue
+            if Colaborador.objects.filter(cedula=cedula).exists():
+                duplicados += 1
+                continue
 
-                Colaborador.objects.create(
-                    cedula=cedula,
-                    nombres=nombres,
-                    cargo=cargo,
-                    jefe_inmediato=jefe,
-                    empresa=empresa,
-                    celular=celular,
-                    fecha_ingreso=fecha_ingreso,
-                )
-                exitosos += 1
-
-            except Exception as e:
-                errores.append(f'Fila {fila_num}: error inesperado ({str(e)}).')
+            Colaborador.objects.create(
+                cedula=cedula,
+                nombres=nombres,
+                cargo=cargo,
+                jefe_inmediato=jefe,
+                empresa=empresa,
+                celular=celular,
+                fecha_ingreso=fecha_ingreso,
+            )
+            exitosos += 1
 
         if exitosos:
             messages.success(request, f'✅ {exitosos} colaborador(es) importado(s) correctamente.')
         if duplicados:
-            messages.warning(request, f'⚠️ {duplicados} registro(s) omitido(s) por cédula duplicada.')
-        for err in errores:
+            messages.warning(request, f'⚠️ {duplicados} fila(s) omitida(s).')
+        for err in errores[:5]:
             messages.error(request, err)
-        if not exitosos and not duplicados:
-            messages.error(request, 'No se importó ningún registro. Revisa el archivo.')
 
         return redirect('periodo:lista')
 
-    return render(request, '_periodo_de_prueba/importar.html')
+    return redirect('periodo:lista')
 
 
 def descargar_plantilla(request):
@@ -203,7 +227,6 @@ def descargar_plantilla(request):
         ("Nombres Completos",            35),
         ("Cargo",                        35),
         ("Jefe Inmediato",               28),
-        ("Correo Jefe (opcional)",       30),
         ("Empresa",                      18),
         ("No Celular",                   18),
         ("Fecha Ingreso (AAAA-MM-DD)",   26),
@@ -255,7 +278,6 @@ def descargar_plantilla(request):
         ("Nombres Completos",          "Nombre y apellidos en mayúsculas.",        "ALDO FLECHAS ALVAREZ"),
         ("Cargo",                      "Cargo o rol del colaborador.",             "APRENDIZ SENA"),
         ("Jefe Inmediato",             "Nombre del jefe inmediato.",               "ING. JAVIER MOJICA"),
-        ("Correo Jefe (opcional)",     "Correo del jefe para notificaciones.",     "javier.mojica@empresa.com"),
         ("Empresa",                    "CARBOINSA | INCARSA | UNIMINAS | MILPA",   "INCARSA"),
         ("No Celular",                 "Sin espacios ni guiones.",                 "3137774696"),
         ("Fecha Ingreso (AAAA-MM-DD)", "Formato AÑO-MES-DÍA.",                    "2025-01-10"),
@@ -314,27 +336,6 @@ def descargar_plantilla(request):
     )
     response["Content-Disposition"] = 'attachment; filename="plantilla_colaboradores.xlsx"'
     return response
-
-
-def lista_jefes(request):
-    jefes = Colaborador.objects.values('jefe_inmediato', 'correo_jefe').distinct().order_by('jefe_inmediato')
-    return render(request, '_periodo_de_prueba/jefes/lista.html', {'jefes': jefes})
-
-
-def editar_correo_jefe(request):
-    nombre_jefe = request.GET.get('nombre', '')
-    if request.method == 'POST':
-        nombre_jefe = request.POST.get('nombre_jefe', '')
-        correo_nuevo = request.POST.get('correo_jefe', '')
-        Colaborador.objects.filter(jefe_inmediato=nombre_jefe).update(correo_jefe=correo_nuevo)
-        messages.success(request, f'Correo de {nombre_jefe} actualizado correctamente.')
-        return redirect('periodo:lista_jefes')
-    return render(request, '_periodo_de_prueba/jefes/editar.html', {
-        'nombre_jefe': nombre_jefe,
-        'correo_actual': Colaborador.objects.filter(
-            jefe_inmediato=nombre_jefe
-        ).values_list('correo_jefe', flat=True).first() or '',
-    })
 
 
 def ejecutar_alertas(request):
