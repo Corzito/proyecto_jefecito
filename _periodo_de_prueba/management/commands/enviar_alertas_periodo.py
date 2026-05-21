@@ -145,7 +145,7 @@ class Command(BaseCommand):
             email = EmailMultiAlternatives(
                 subject=asunto,
                 body="Alertas periodo de prueba. Abra en HTML para ver el detalle.",
-                from_email=settings.EMAIL_HOST_USER,
+                from_email='onboarding@resend.dev',
                 to=[CORREO_CRISTIAN],
             )
             email.attach_alternative(mensaje_html, "text/html")

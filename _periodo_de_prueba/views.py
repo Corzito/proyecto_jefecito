@@ -149,7 +149,7 @@ def enviar_alerta_jefe(request, pk):
         email = EmailMultiAlternatives(
             subject=asunto,
             body=f"Evaluación pendiente para {colaborador.nombres}.",
-            from_email=settings.EMAIL_HOST_USER,
+            from_email='onboarding@resend.dev',
             to=[colaborador.correo_jefe],
         )
         email.attach_alternative(mensaje_html, "text/html")
@@ -218,7 +218,7 @@ def _enviar_correo_jefe(colaborador, tipo_evaluacion):
         email = EmailMultiAlternatives(
             subject=asunto,
             body=f"Evaluación pendiente para {colaborador.nombres}.",
-            from_email=settings.EMAIL_HOST_USER,
+            from_email='onboarding@resend.dev',
             to=[colaborador.correo_jefe],
         )
         email.attach_alternative(mensaje_html, "text/html")
