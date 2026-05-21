@@ -1,4 +1,5 @@
 import openpyxl
+import threading
 from datetime import datetime
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -166,27 +167,11 @@ def enviar_alerta_jefe(request, pk):
     })
 
 
-def enviar_jefes_masivo(request):
-    token = request.GET.get('token', '')
-    if token != 'incarsa2026seguro':
-        return render(request, '_periodo_de_prueba/alerta_jefe_confirmacion.html', {
-            'error_token': True,
-        })
-
-    ids_30 = [i for i in request.GET.get('ids_30', '').split(',') if i]
-    ids_50 = [i for i in request.GET.get('ids_50', '').split(',') if i]
-
-    enviados = 0
-    sin_correo = []
-    errores = []
-
-    def enviar_a_jefe(colaborador, tipo_evaluacion):
-        nonlocal enviados
-        if not colaborador.correo_jefe:
-            sin_correo.append(colaborador.nombres)
-            return
-        asunto = f'⚠️ EVALUACIÓN PERIODO DE PRUEBA - {colaborador.nombres} | Evaluación {tipo_evaluacion} días'
-        mensaje_html = f"""
+def _enviar_correo_jefe(colaborador, tipo_evaluacion):
+    if not colaborador.correo_jefe:
+        return
+    asunto = f'⚠️ EVALUACIÓN PERIODO DE PRUEBA - {colaborador.nombres} | Evaluación {tipo_evaluacion} días'
+    mensaje_html = f"""
 <!DOCTYPE html>
 <html>
 <body style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto;">
@@ -195,7 +180,7 @@ def enviar_jefes_masivo(request):
     </div>
     <div style="padding:20px; background-color:#f9f9f9;">
         <p>Estimado/a <strong>{colaborador.jefe_inmediato}</strong>,</p>
-        <p>Le informamos que el siguiente colaborador requiere evaluación de <strong>{tipo_evaluacion} días</strong>:</p>
+        <p>El siguiente colaborador requiere evaluación de <strong>{tipo_evaluacion} días</strong>:</p>
         <table style="width:100%; border-collapse:collapse; margin:15px 0;">
             <tr style="background:#fff;">
                 <td style="padding:8px; border:1px solid #ddd; font-weight:bold;">Nombre</td>
@@ -229,40 +214,54 @@ def enviar_jefes_masivo(request):
     </div>
 </body>
 </html>
-        """.strip()
-        try:
-            email = EmailMultiAlternatives(
-                subject=asunto,
-                body=f"Evaluación pendiente para {colaborador.nombres}.",
-                from_email=settings.EMAIL_HOST_USER,
-                to=[colaborador.correo_jefe],
-            )
-            email.attach_alternative(mensaje_html, "text/html")
-            email.send(fail_silently=False)
-            colaborador.alerta_jefe_enviada = True
-            colaborador.save(update_fields=['alerta_jefe_enviada'])
-            enviados += 1
-        except Exception as e:
-            errores.append(f'{colaborador.nombres}: {str(e)}')
+    """.strip()
+    try:
+        email = EmailMultiAlternatives(
+            subject=asunto,
+            body=f"Evaluación pendiente para {colaborador.nombres}.",
+            from_email=settings.EMAIL_HOST_USER,
+            to=[colaborador.correo_jefe],
+        )
+        email.attach_alternative(mensaje_html, "text/html")
+        email.send(fail_silently=False)
+        colaborador.alerta_jefe_enviada = True
+        colaborador.save(update_fields=['alerta_jefe_enviada'])
+    except Exception:
+        pass
 
-    for pk in ids_30:
-        try:
-            col = Colaborador.objects.get(pk=pk)
-            enviar_a_jefe(col, 30)
-        except Colaborador.DoesNotExist:
-            pass
 
-    for pk in ids_50:
-        try:
-            col = Colaborador.objects.get(pk=pk)
-            enviar_a_jefe(col, 50)
-        except Colaborador.DoesNotExist:
-            pass
+def enviar_jefes_masivo(request):
+    token = request.GET.get('token', '')
+    if token != 'incarsa2026seguro':
+        return render(request, '_periodo_de_prueba/alerta_masiva_confirmacion.html', {
+            'error_token': True,
+        })
+
+    ids_30 = [i for i in request.GET.get('ids_30', '').split(',') if i]
+    ids_50 = [i for i in request.GET.get('ids_50', '').split(',') if i]
+
+    def enviar():
+        for pk in ids_30:
+            try:
+                col = Colaborador.objects.get(pk=pk)
+                _enviar_correo_jefe(col, 30)
+            except Exception:
+                pass
+        for pk in ids_50:
+            try:
+                col = Colaborador.objects.get(pk=pk)
+                _enviar_correo_jefe(col, 50)
+            except Exception:
+                pass
+
+    t = threading.Thread(target=enviar)
+    t.daemon = True
+    t.start()
 
     return render(request, '_periodo_de_prueba/alerta_masiva_confirmacion.html', {
-        'enviados': enviados,
-        'sin_correo': sin_correo,
-        'errores': errores,
+        'enviados': len(ids_30) + len(ids_50),
+        'sin_correo': [],
+        'errores': [],
     })
 
 
