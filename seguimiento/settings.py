@@ -93,5 +93,5 @@ EMAIL_HOST = 'smtp.office365.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'gestion.reportes@incarsa.com.co')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'Gqrs+9658/')
 DEFAULT_FROM_EMAIL = os.environ.get('EMAIL_HOST_USER', 'gestion.reportes@incarsa.com.co')
