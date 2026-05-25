@@ -1,11 +1,16 @@
 from django.db import models
 
-
 EMPRESA_CHOICES = [
     ('CARBOINSA', 'CARBOINSA S.A.S.'),
     ('INCARSA', 'INCARSA S.A.S.'),
     ('UNIMINAS', 'UNIMINAS'),
     ('MILPA', 'MILPA S.A.S.'),
+]
+
+RESULTADO_CHOICES = [
+    ('pendiente', 'Pendiente'),
+    ('aprobado', 'Aprobó'),
+    ('no_aprobado', 'No Aprobó'),
 ]
 
 
@@ -25,6 +30,14 @@ class Colaborador(models.Model):
 
     evaluacion_30_completada = models.BooleanField(default=False, verbose_name='Evaluación 30 días completada')
     evaluacion_50_completada = models.BooleanField(default=False, verbose_name='Evaluación 50 días completada')
+
+    resultado_periodo = models.CharField(
+        max_length=20,
+        choices=RESULTADO_CHOICES,
+        default='pendiente',
+        verbose_name='Resultado Periodo de Prueba'
+    )
+    observaciones = models.TextField(blank=True, null=True, verbose_name='Observaciones')
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -53,3 +66,11 @@ class Colaborador(models.Model):
         elif dias >= 50:
             return 'completado'
         return 'activo'
+
+    def periodo_actual(self):
+        dias = self.dias_en_empresa()
+        if dias < 30:
+            return 'primer_periodo'
+        elif dias < 50:
+            return 'segundo_periodo'
+        return 'completado'
