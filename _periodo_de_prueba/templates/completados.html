@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Periodo de Prueba Completado{% endblock %}
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0" style="color:#198754;">
+                <i class="fas fa-user-check me-2"></i>Periodo de Prueba Completado
+            </h2>
+            <small class="text-muted">Colaboradores con más de 50 días — {{ total }} registro(s)</small>
+        </div>
+    </div>
+
+    <form method="GET" class="mb-3 d-flex gap-2 flex-wrap">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar por nombre o cédula" style="max-width:250px;">
+        <select name="resultado" class="form-control" style="max-width:180px;">
+            <option value="">Todos los resultados</option>
+            <option value="pendiente" {% if resultado_filtro == 'pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="aprobado" {% if resultado_filtro == 'aprobado' %}selected{% endif %}>Aprobó</option>
+            <option value="no_aprobado" {% if resultado_filtro == 'no_aprobado' %}selected{% endif %}>No Aprobó</option>
+        </select>
+        <button type="submit" class="btn btn-success"><i class="fas fa-search"></i></button>
+        {% if q or resultado_filtro %}<a href="{% url 'periodo:completados' %}" class="btn btn-outline-secondary">Limpiar</a>{% endif %}
+    </form>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header text-white py-3" style="background-color:#198754;">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-table me-2"></i>Colaboradores Completados</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead style="background-color:#f8f9fa;">
+                        <tr>
+                            <th class="px-3">#</th>
+                            <th>Cédula</th>
+                            <th>Nombres</th>
+                            <th>Cargo</th>
+                            <th>Jefe Inmediato</th>
+                            <th>Empresa</th>
+                            <th>F. Ingreso</th>
+                            <th class="text-center">Días</th>
+                            <th class="text-center">Resultado</th>
+                            <th>Observaciones</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in colaboradores %}
+                        <tr>
+                            <td class="px-3 text-muted">{{ forloop.counter }}</td>
+                            <td><code>{{ item.obj.cedula }}</code></td>
+                            <td class="fw-semibold">{{ item.obj.nombres }}</td>
+                            <td>{{ item.obj.cargo }}</td>
+                            <td>{{ item.obj.jefe_inmediato }}</td>
+                            <td><span class="badge" style="background-color:#E32822;">{{ item.obj.empresa }}</span></td>
+                            <td>{{ item.obj.fecha_ingreso|date:"d/m/Y" }}</td>
+                            <td class="text-center fw-bold text-success">{{ item.dias }}</td>
+                            <td class="text-center">
+                                {% if item.obj.resultado_periodo == 'aprobado' %}
+                                    <span class="badge bg-success">✅ Aprobó</span>
+                                {% elif item.obj.resultado_periodo == 'no_aprobado' %}
+                                    <span class="badge bg-danger">❌ No Aprobó</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">⏳ Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ item.obj.observaciones|default:"—" }}</small>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'periodo:marcar_resultado' item.obj.pk %}"
+                                   class="btn btn-sm btn-outline-success" title="Marcar resultado">
+                                    <i class="fas fa-clipboard-check"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="11" class="text-center py-5 text-muted">
+                                <i class="fas fa-user-check fa-3x mb-3 d-block"></i>
+                                No hay colaboradores completados aún.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

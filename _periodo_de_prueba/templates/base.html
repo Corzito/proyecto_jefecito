@@ -136,6 +136,24 @@
       </div>
     </div>
   </nav>
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'primer_periodo' %}active{% endif %}"
+       href="{% url 'periodo:primer_periodo' %}">
+        <i class="fas fa-user-clock me-1"></i>1er Periodo
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'segundo_periodo' %}active{% endif %}"
+       href="{% url 'periodo:segundo_periodo' %}">
+        <i class="fas fa-user-clock me-1"></i>2do Periodo
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'completados' %}active{% endif %}"
+       href="{% url 'periodo:completados' %}">
+        <i class="fas fa-user-check me-1"></i>Completados
+    </a>
+</li>
 
   {% if messages %}
   <div class="messages-container">

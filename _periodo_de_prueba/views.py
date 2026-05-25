@@ -14,6 +14,39 @@ from .forms import ColaboradorForm
 def lista_colaboradores(request):
     colaboradores = Colaborador.objects.all()
     hoy = timezone.now().date()
+
+    # Filtros
+    q = request.GET.get('q', '').strip()
+    empresa_filtro = request.GET.get('empresa', '').strip()
+    fecha_desde = request.GET.get('fecha_desde', '').strip()
+    fecha_hasta = request.GET.get('fecha_hasta', '').strip()
+    orden = request.GET.get('orden', 'fecha_ingreso')
+
+    if q:
+        from django.db.models import Q
+        colaboradores = colaboradores.filter(
+            Q(nombres__icontains=q) | Q(cedula__icontains=q)
+        )
+    if empresa_filtro:
+        colaboradores = colaboradores.filter(empresa=empresa_filtro)
+    if fecha_desde:
+        try:
+            colaboradores = colaboradores.filter(fecha_ingreso__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            colaboradores = colaboradores.filter(fecha_ingreso__lte=fecha_hasta)
+        except Exception:
+            pass
+
+    if orden == 'nombres':
+        colaboradores = colaboradores.order_by('nombres')
+    elif orden == 'empresa':
+        colaboradores = colaboradores.order_by('empresa', 'nombres')
+    else:
+        colaboradores = colaboradores.order_by('fecha_ingreso', 'nombres')
+
     data = []
     alertas_pendientes = 0
 
@@ -34,6 +67,11 @@ def lista_colaboradores(request):
         'colaboradores': data,
         'alertas_pendientes': alertas_pendientes,
         'hoy': hoy,
+        'q': q,
+        'empresa_filtro': empresa_filtro,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'orden': orden,
     })
 
 
@@ -80,6 +118,115 @@ def marcar_evaluacion(request, pk, tipo):
     colaborador.save()
     messages.success(request, f'Evaluación de {tipo} días marcada como completada.')
     return redirect('periodo:lista')
+
+
+def marcar_resultado(request, pk):
+    colaborador = get_object_or_404(Colaborador, pk=pk)
+    if request.method == 'POST':
+        resultado = request.POST.get('resultado', 'pendiente')
+        observaciones = request.POST.get('observaciones', '')
+        colaborador.resultado_periodo = resultado
+        colaborador.observaciones = observaciones
+        colaborador.save()
+        messages.success(request, f'Resultado de {colaborador.nombres} actualizado.')
+        return redirect('periodo:completados')
+    return render(request, '_periodo_de_prueba/marcar_resultado.html', {
+        'colaborador': colaborador,
+    })
+
+
+def primer_periodo(request):
+    hoy = timezone.now().date()
+    q = request.GET.get('q', '').strip()
+    colaboradores = Colaborador.objects.all()
+
+    if q:
+        from django.db.models import Q
+        colaboradores = colaboradores.filter(
+            Q(nombres__icontains=q) | Q(cedula__icontains=q)
+        )
+
+    data = []
+    for col in colaboradores:
+        dias = (hoy - col.fecha_ingreso).days
+        if dias < 30:
+            estado = col.estado_periodo()
+            data.append({
+                'obj': col,
+                'dias': dias,
+                'estado': estado,
+                'dias_para_30': max(0, 30 - dias),
+            })
+
+    return render(request, '_periodo_de_prueba/primer_periodo.html', {
+        'colaboradores': data,
+        'hoy': hoy,
+        'q': q,
+        'total': len(data),
+    })
+
+
+def segundo_periodo(request):
+    hoy = timezone.now().date()
+    q = request.GET.get('q', '').strip()
+    colaboradores = Colaborador.objects.all()
+
+    if q:
+        from django.db.models import Q
+        colaboradores = colaboradores.filter(
+            Q(nombres__icontains=q) | Q(cedula__icontains=q)
+        )
+
+    data = []
+    for col in colaboradores:
+        dias = (hoy - col.fecha_ingreso).days
+        if 30 <= dias < 50:
+            estado = col.estado_periodo()
+            data.append({
+                'obj': col,
+                'dias': dias,
+                'estado': estado,
+                'dias_para_50': max(0, 50 - dias),
+            })
+
+    return render(request, '_periodo_de_prueba/segundo_periodo.html', {
+        'colaboradores': data,
+        'hoy': hoy,
+        'q': q,
+        'total': len(data),
+    })
+
+
+def completados(request):
+    hoy = timezone.now().date()
+    q = request.GET.get('q', '').strip()
+    resultado_filtro = request.GET.get('resultado', '').strip()
+    colaboradores = Colaborador.objects.all()
+
+    if q:
+        from django.db.models import Q
+        colaboradores = colaboradores.filter(
+            Q(nombres__icontains=q) | Q(cedula__icontains=q)
+        )
+    if resultado_filtro:
+        colaboradores = colaboradores.filter(resultado_periodo=resultado_filtro)
+
+    data = []
+    for col in colaboradores:
+        dias = (hoy - col.fecha_ingreso).days
+        if dias >= 50:
+            data.append({
+                'obj': col,
+                'dias': dias,
+            })
+
+    return render(request, '_periodo_de_prueba/completados.html', {
+        'colaboradores': data,
+        'hoy': hoy,
+        'q': q,
+        'resultado_filtro': resultado_filtro,
+        'total': len(data),
+    })
 
 
 def importar_excel(request):
@@ -141,13 +288,13 @@ def importar_excel(request):
                 val = fila[idx]
                 return str(val).strip() if val is not None else ""
 
-            cedula      = get("cedula")
-            nombres     = get("nombres")
-            cargo       = get("cargo")
-            jefe        = get("jefe_inmediato")
-            empresa     = get("empresa").upper()
-            celular     = get("celular")
-            fecha_str   = get("fecha_ingreso")
+            cedula    = get("cedula")
+            nombres   = get("nombres")
+            cargo     = get("cargo")
+            jefe      = get("jefe_inmediato")
+            empresa   = get("empresa").upper()
+            celular   = get("celular")
+            fecha_str = get("fecha_ingreso")
 
             if not cedula or not nombres:
                 errores.append(f'Fila {fila_num}: cédula o nombre vacío.')
@@ -175,6 +322,12 @@ def importar_excel(request):
                 duplicados += 1
                 continue
 
+            # Determinar alertas según días transcurridos
+            from datetime import date as date_type
+            dias = (date_type.today() - fecha_ingreso).days
+            alerta_30 = dias >= 23
+            alerta_50 = dias >= 43
+
             Colaborador.objects.create(
                 cedula=cedula,
                 nombres=nombres,
@@ -183,6 +336,8 @@ def importar_excel(request):
                 empresa=empresa,
                 celular=celular,
                 fecha_ingreso=fecha_ingreso,
+                alerta_30_enviada=alerta_30,
+                alerta_50_enviada=alerta_50,
             )
             exitosos += 1
 
