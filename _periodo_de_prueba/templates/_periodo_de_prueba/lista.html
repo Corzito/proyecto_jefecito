@@ -120,32 +120,36 @@
   <!-- Tarjetas resumen -->
   <div class="row mb-4">
     <div class="col-md-3">
-      <div class="card border-0 shadow-sm text-center py-3">
-        <div class="fs-1 fw-bold text-secondary">{{ colaboradores|length }}</div>
-        <div class="text-muted small">Total</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card border-0 shadow-sm text-center py-3" style="border-left:4px solid #E32822 !important;">
-        <div class="fs-1 fw-bold" style="color:#E32822;">{{ alertas_pendientes }}</div>
-        <div class="text-muted small">Alertas Activas</div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card border-0 shadow-sm text-center py-3" style="border-left:4px solid #ffc107 !important;">
-        <div class="fs-1 fw-bold text-warning">
-          {% for c in colaboradores %}{% if c.estado == 'en_seguimiento' or c.estado == 'alerta_50' %}1{% endif %}{% endfor %}
+      <a href="{% url 'periodo:lista' %}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm text-center py-4" style="border-left:4px solid #6c757d !important;">
+          <div class="fs-1 fw-bold text-secondary">{{ colaboradores|length }}</div>
+          <div class="text-muted small fw-semibold text-uppercase">Total Colaboradores</div>
         </div>
-        <div class="text-muted small">En Seguimiento</div>
-      </div>
+      </a>
     </div>
     <div class="col-md-3">
-      <div class="card border-0 shadow-sm text-center py-3" style="border-left:4px solid #198754 !important;">
-        <div class="fs-1 fw-bold text-success">
-          {% for c in colaboradores %}{% if c.estado == 'completado' %}1{% endif %}{% endfor %}
+      <a href="{% url 'periodo:primer_periodo' %}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm text-center py-4" style="border-left:4px solid #E32822 !important;">
+          <div class="fs-1 fw-bold" style="color:#E32822;">{{ alertas_pendientes }}</div>
+          <div class="text-muted small fw-semibold text-uppercase">Alertas Activas</div>
         </div>
-        <div class="text-muted small">Completados</div>
-      </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{% url 'periodo:segundo_periodo' %}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm text-center py-4" style="border-left:4px solid #ffc107 !important;">
+          <div class="fs-1 fw-bold text-warning">{{ en_seguimiento }}</div>
+          <div class="text-muted small fw-semibold text-uppercase">En Seguimiento</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{% url 'periodo:completados' %}" class="text-decoration-none">
+        <div class="card border-0 shadow-sm text-center py-4" style="border-left:4px solid #198754 !important;">
+          <div class="fs-1 fw-bold text-success">{{ completados_count }}</div>
+          <div class="text-muted small fw-semibold text-uppercase">Completados</div>
+        </div>
+      </a>
     </div>
   </div>
 

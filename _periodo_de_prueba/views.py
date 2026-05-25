@@ -49,12 +49,18 @@ def lista_colaboradores(request):
 
     data = []
     alertas_pendientes = 0
+    en_seguimiento = 0
+    completados_count = 0
 
     for col in colaboradores:
         dias = (hoy - col.fecha_ingreso).days
         estado = col.estado_periodo()
         if estado in ('alerta_30', 'alerta_50'):
             alertas_pendientes += 1
+        if estado in ('en_seguimiento', 'alerta_50'):
+            en_seguimiento += 1
+        if estado == 'completado':
+            completados_count += 1
         data.append({
             'obj': col,
             'dias': dias,
@@ -66,6 +72,8 @@ def lista_colaboradores(request):
     return render(request, '_periodo_de_prueba/lista.html', {
         'colaboradores': data,
         'alertas_pendientes': alertas_pendientes,
+        'en_seguimiento': en_seguimiento,
+        'completados_count': completados_count,
         'hoy': hoy,
         'q': q,
         'empresa_filtro': empresa_filtro,
