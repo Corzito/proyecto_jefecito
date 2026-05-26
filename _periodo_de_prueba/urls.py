@@ -16,4 +16,5 @@ urlpatterns = [
     path('segundo-periodo/', views.segundo_periodo, name='segundo_periodo'),
     path('completados/', views.completados, name='completados'),
     path('resultado/<int:pk>/', views.marcar_resultado, name='marcar_resultado'),
+    path('ping/', views.ping, name='ping'),
 ]

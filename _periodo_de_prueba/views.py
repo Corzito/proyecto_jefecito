@@ -510,3 +510,6 @@ def ejecutar_alertas(request):
         return JsonResponse({'status': 'ok', 'mensaje': 'Alertas procesadas correctamente'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=500)
+
+def ping(request):
+    return JsonResponse({'status': 'ok'})
