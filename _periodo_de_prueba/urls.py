@@ -17,4 +17,5 @@ urlpatterns = [
     path('completados/', views.completados, name='completados'),
     path('resultado/<int:pk>/', views.marcar_resultado, name='marcar_resultado'),
     path('ping/', views.ping, name='ping'),
+    path('reporte-excel/', views.reporte_excel, name='reporte_excel'),
 ]

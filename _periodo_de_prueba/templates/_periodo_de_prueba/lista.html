@@ -23,6 +23,9 @@
       <a href="{% url 'periodo:descargar_plantilla' %}" class="btn btn-outline-success">
         <i class="fas fa-file-excel me-1"></i>Plantilla
       </a>
+      <a href="{% url 'periodo:reporte_excel' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-file-spreadsheet me-1"></i>Reporte Excel
+      </a>
       <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalCargaMasiva">
         <i class="fas fa-upload me-1"></i>Carga Masiva
       </button>
@@ -45,9 +48,9 @@
         <select name="empresa" class="form-control form-control-sm">
           <option value="">Todas</option>
           <option value="CARBOINSA" {% if empresa_filtro == 'CARBOINSA' %}selected{% endif %}>CARBOINSA</option>
-          <option value="INCARSA" {% if empresa_filtro == 'INCARSA' %}selected{% endif %}>INCARSA</option>
-          <option value="UNIMINAS" {% if empresa_filtro == 'UNIMINAS' %}selected{% endif %}>UNIMINAS</option>
-          <option value="MILPA" {% if empresa_filtro == 'MILPA' %}selected{% endif %}>MILPA</option>
+          <option value="INCARSA"   {% if empresa_filtro == 'INCARSA'   %}selected{% endif %}>INCARSA</option>
+          <option value="UNIMINAS"  {% if empresa_filtro == 'UNIMINAS'  %}selected{% endif %}>UNIMINAS</option>
+          <option value="MILPA"     {% if empresa_filtro == 'MILPA'     %}selected{% endif %}>MILPA</option>
         </select>
       </div>
       <div class="col-md-2">
@@ -62,8 +65,8 @@
         <label class="form-label small fw-semibold mb-1">Ordenar por</label>
         <select name="orden" class="form-control form-control-sm">
           <option value="fecha_ingreso" {% if orden == 'fecha_ingreso' %}selected{% endif %}>Fecha ingreso</option>
-          <option value="nombres" {% if orden == 'nombres' %}selected{% endif %}>Nombre A-Z</option>
-          <option value="empresa" {% if orden == 'empresa' %}selected{% endif %}>Empresa</option>
+          <option value="nombres"       {% if orden == 'nombres'       %}selected{% endif %}>Nombre A-Z</option>
+          <option value="empresa"       {% if orden == 'empresa'       %}selected{% endif %}>Empresa</option>
         </select>
       </div>
       <div class="col-md-1 d-flex gap-1">
@@ -76,6 +79,14 @@
       </div>
     </div>
   </form>
+
+  <!-- Mensajes -->
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+    {{ msg }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
 
   <!-- MODAL CARGA MASIVA -->
   <div class="modal fade" id="modalCargaMasiva" tabindex="-1" aria-hidden="true">

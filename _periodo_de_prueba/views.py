@@ -1,12 +1,16 @@
+import io
 import openpyxl
-from datetime import datetime
+from datetime import datetime, date as date_type
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.core.management import call_command
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from .models import Colaborador
 from .forms import ColaboradorForm
 
@@ -15,7 +19,6 @@ def lista_colaboradores(request):
     colaboradores = Colaborador.objects.all()
     hoy = timezone.now().date()
 
-    # Filtros
     q = request.GET.get('q', '').strip()
     empresa_filtro = request.GET.get('empresa', '').strip()
     fecha_desde = request.GET.get('fecha_desde', '').strip()
@@ -316,8 +319,10 @@ def importar_excel(request):
 
             try:
                 val_fecha = fila[indices["fecha_ingreso"]]
-                from datetime import date
-                if isinstance(val_fecha, date):
+                # ✅ FIX: normalizar datetime a date si viene como datetime del Excel
+                if isinstance(val_fecha, datetime):
+                    fecha_ingreso = val_fecha.date()
+                elif isinstance(val_fecha, date_type):
                     fecha_ingreso = val_fecha
                 else:
                     fecha_ingreso = datetime.strptime(fecha_str, "%Y-%m-%d").date()
@@ -330,8 +335,6 @@ def importar_excel(request):
                 duplicados += 1
                 continue
 
-            # Determinar alertas según días transcurridos
-            from datetime import date as date_type
             dias = (date_type.today() - fecha_ingreso).days
             alerta_30 = dias >= 23
             alerta_50 = dias >= 43
@@ -362,16 +365,6 @@ def importar_excel(request):
 
 
 def descargar_plantilla(request):
-    import io
-    from django.http import HttpResponse
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Colaboradores"
-
     rojo       = "E32822"
     blanco     = "FFFFFF"
     gris_claro = "F2F2F2"
@@ -384,6 +377,10 @@ def descargar_plantilla(request):
         top=Side(style="thin"),  bottom=Side(style="thin"),
     )
     data_align = Alignment(horizontal="left", vertical="center")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Colaboradores"
 
     columnas = [
         ("Cédula No",                   20),
@@ -501,6 +498,235 @@ def descargar_plantilla(request):
     return response
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# REPORTE EXCEL — filtro por fecha + selección de colaboradores
+# ─────────────────────────────────────────────────────────────────────────────
+
+def reporte_excel(request):
+    """
+    GET  → muestra la página con filtros y lista de colaboradores seleccionables.
+    POST → genera y descarga el Excel con los colaboradores seleccionados.
+    """
+    hoy = timezone.now().date()
+
+    # Parámetros de filtro (presentes en GET y en POST)
+    fecha_desde    = request.POST.get('fecha_desde', request.GET.get('fecha_desde', '')).strip()
+    fecha_hasta    = request.POST.get('fecha_hasta', request.GET.get('fecha_hasta', '')).strip()
+    empresa_filtro = request.POST.get('empresa', request.GET.get('empresa', '')).strip()
+
+    colaboradores = Colaborador.objects.all().order_by('empresa', 'nombres')
+
+    if fecha_desde:
+        try:
+            colaboradores = colaboradores.filter(fecha_ingreso__gte=fecha_desde)
+        except Exception:
+            pass
+    if fecha_hasta:
+        try:
+            colaboradores = colaboradores.filter(fecha_ingreso__lte=fecha_hasta)
+        except Exception:
+            pass
+    if empresa_filtro:
+        colaboradores = colaboradores.filter(empresa=empresa_filtro)
+
+    # Construir data con días calculados
+    data = []
+    for col in colaboradores:
+        dias = (hoy - col.fecha_ingreso).days
+        estado = col.estado_periodo()
+        etiqueta_estado = {
+            'en_seguimiento': 'En seguimiento',
+            'alerta_30':      'Alerta 30 días',
+            'alerta_50':      'Alerta 50 días',
+            'completado':     'Completado',
+        }.get(estado, estado)
+        data.append({
+            'obj': col,
+            'dias': dias,
+            'estado': etiqueta_estado,
+        })
+
+    # ── POST: generar el Excel ──────────────────────────────────────────────
+    if request.method == 'POST':
+        ids_seleccionados = request.POST.getlist('colaboradores_ids')
+        if not ids_seleccionados:
+            messages.warning(request, 'Selecciona al menos un colaborador para generar el reporte.')
+            return render(request, '_periodo_de_prueba/reporte_excel.html', {
+                'data': data,
+                'hoy': hoy,
+                'fecha_desde': fecha_desde,
+                'fecha_hasta': fecha_hasta,
+                'empresa_filtro': empresa_filtro,
+            })
+
+        seleccionados = [d for d in data if str(d['obj'].pk) in ids_seleccionados]
+
+        rojo   = "E32822"
+        blanco = "FFFFFF"
+        gris   = "F2F2F2"
+
+        thin = Border(
+            left=Side(style="thin"), right=Side(style="thin"),
+            top=Side(style="thin"),  bottom=Side(style="thin"),
+        )
+        header_font  = Font(bold=True, color=blanco, size=10)
+        header_fill  = PatternFill("solid", fgColor=rojo)
+        header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        center       = Alignment(horizontal="center", vertical="center")
+        left         = Alignment(horizontal="left",   vertical="center")
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Reporte Periodo de Prueba"
+
+        # ── Título del reporte ──────────────────────────────────────────────
+        ws.merge_cells("A1:K1")
+        titulo_cell = ws["A1"]
+        titulo_cell.value     = "REPORTE PERIODO DE PRUEBA — GRUPO EMPRESARIAL"
+        titulo_cell.font      = Font(bold=True, color=blanco, size=13)
+        titulo_cell.fill      = PatternFill("solid", fgColor=rojo)
+        titulo_cell.alignment = Alignment(horizontal="center", vertical="center")
+        titulo_cell.border    = thin
+        ws.row_dimensions[1].height = 28
+
+        # ── Subtítulo con rango de fechas ───────────────────────────────────
+        ws.merge_cells("A2:K2")
+        rango_txt = ""
+        if fecha_desde and fecha_hasta:
+            rango_txt = f"Ingreso entre {fecha_desde} y {fecha_hasta}"
+        elif fecha_desde:
+            rango_txt = f"Ingreso desde {fecha_desde}"
+        elif fecha_hasta:
+            rango_txt = f"Ingreso hasta {fecha_hasta}"
+        if empresa_filtro:
+            rango_txt = (rango_txt + f" | Empresa: {empresa_filtro}").strip(" | ")
+        sub_cell = ws["A2"]
+        sub_cell.value     = rango_txt or "Todos los colaboradores seleccionados"
+        sub_cell.font      = Font(italic=True, size=10, color="555555")
+        sub_cell.alignment = Alignment(horizontal="center", vertical="center")
+        sub_cell.border    = thin
+        ws.row_dimensions[2].height = 18
+
+        # Fila en blanco
+        ws.row_dimensions[3].height = 6
+
+        # ── Encabezados de columna ──────────────────────────────────────────
+        encabezados = [
+            ("N°",                        5),
+            ("Cédula",                    15),
+            ("Nombres Completos",         35),
+            ("Cargo",                     28),
+            ("Jefe Inmediato",            25),
+            ("Empresa",                   14),
+            ("Celular",                   14),
+            ("Fecha Ingreso",             16),
+            ("Días Transcurridos",        10),
+            ("Estado",                    18),
+            ("Resultado / Observaciones", 30),
+        ]
+
+        for col_idx, (label, width) in enumerate(encabezados, start=1):
+            cell = ws.cell(row=4, column=col_idx, value=label)
+            cell.font      = header_font
+            cell.fill      = header_fill
+            cell.alignment = header_align
+            cell.border    = thin
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+        ws.row_dimensions[4].height = 30
+
+        # ── Filas de datos ──────────────────────────────────────────────────
+        fill_par   = PatternFill("solid", fgColor=gris)
+        fill_impar = PatternFill("solid", fgColor=blanco)
+
+        # Color de estado
+        color_estado = {
+            'En seguimiento': ("FFF2CC", "7F6000"),  # amarillo
+            'Alerta 30 días': ("FCE4D6", "833C0B"),  # naranja
+            'Alerta 50 días': ("F4CCCC", "990000"),  # rojo claro
+            'Completado':     ("E2EFDA", "375623"),  # verde
+        }
+
+        resultado_labels = {
+            'aprobado':    '✅ Aprobado',
+            'no_aprobado': '❌ No aprobado',
+            'pendiente':   '⏳ Pendiente',
+        }
+
+        for fila_idx, item in enumerate(seleccionados, start=1):
+            col = item['obj']
+            fila_excel = fila_idx + 4
+            fill = fill_par if fila_idx % 2 == 0 else fill_impar
+            resultado_txt = resultado_labels.get(col.resultado_periodo, col.resultado_periodo or '')
+            if col.observaciones:
+                resultado_txt += f" — {col.observaciones}"
+
+            valores = [
+                fila_idx,
+                col.cedula,
+                col.nombres,
+                col.cargo,
+                col.jefe_inmediato,
+                col.empresa,
+                col.celular,
+                col.fecha_ingreso.strftime("%Y-%m-%d"),
+                item['dias'],
+                item['estado'],
+                resultado_txt,
+            ]
+
+            for col_idx, valor in enumerate(valores, start=1):
+                cell = ws.cell(row=fila_excel, column=col_idx, value=valor)
+                cell.border    = thin
+                cell.alignment = center if col_idx in (1, 9) else left
+                # Estado con color
+                if col_idx == 10:
+                    bg, fg = color_estado.get(item['estado'], (gris, "000000"))
+                    cell.fill = PatternFill("solid", fgColor=bg)
+                    cell.font = Font(bold=True, color=fg, size=10)
+                else:
+                    cell.fill = fill
+                    cell.font = Font(size=10)
+            ws.row_dimensions[fila_excel].height = 18
+
+        # ── Fila de total ───────────────────────────────────────────────────
+        fila_total = len(seleccionados) + 5
+        ws.merge_cells(f"A{fila_total}:H{fila_total}")
+        tc = ws.cell(row=fila_total, column=1, value=f"Total de colaboradores en el reporte: {len(seleccionados)}")
+        tc.font      = Font(bold=True, size=10, color=blanco)
+        tc.fill      = PatternFill("solid", fgColor=rojo)
+        tc.alignment = Alignment(horizontal="right", vertical="center")
+        tc.border    = thin
+        for col_idx in range(2, 12):
+            c = ws.cell(row=fila_total, column=col_idx)
+            c.border = thin
+            if col_idx <= 8:
+                c.fill = PatternFill("solid", fgColor=rojo)
+        ws.row_dimensions[fila_total].height = 20
+
+        ws.freeze_panes = "A5"
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        nombre_archivo = f"reporte_periodo_prueba_{hoy.strftime('%Y%m%d')}.xlsx"
+        response = HttpResponse(
+            buffer,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+        return response
+
+    # ── GET: mostrar la página ──────────────────────────────────────────────
+    return render(request, '_periodo_de_prueba/reporte_excel.html', {
+        'data': data,
+        'hoy': hoy,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'empresa_filtro': empresa_filtro,
+    })
+
+
 def ejecutar_alertas(request):
     token = request.GET.get('token', '')
     if token != 'incarsa2026seguro':
@@ -510,6 +736,7 @@ def ejecutar_alertas(request):
         return JsonResponse({'status': 'ok', 'mensaje': 'Alertas procesadas correctamente'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=500)
+
 
 def ping(request):
     return JsonResponse({'status': 'ok'})
