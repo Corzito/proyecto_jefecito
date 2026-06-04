@@ -32,9 +32,10 @@
           <label class="form-label fw-semibold">Empresa</label>
           <select name="empresa" class="form-select">
             <option value="">— Todas —</option>
-            {% for emp in "CARBOINSA,INCARSA,UNIMINAS,MILPA"|split:"," %}
-            <option value="{{ emp }}" {% if empresa_filtro == emp %}selected{% endif %}>{{ emp }}</option>
-            {% endfor %}
+            <option value="CARBOINSA" {% if empresa_filtro == "CARBOINSA" %}selected{% endif %}>CARBOINSA</option>
+            <option value="INCARSA"   {% if empresa_filtro == "INCARSA"   %}selected{% endif %}>INCARSA</option>
+            <option value="UNIMINAS"  {% if empresa_filtro == "UNIMINAS"  %}selected{% endif %}>UNIMINAS</option>
+            <option value="MILPA"     {% if empresa_filtro == "MILPA"     %}selected{% endif %}>MILPA</option>
           </select>
         </div>
         <div class="col-md-3">
