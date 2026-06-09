@@ -193,7 +193,7 @@
           </thead>
           <tbody>
             {% for item in colaboradores %}
-            <tr class="{% if item.estado == 'alerta_30' or item.estado == 'alerta_50' %}table-danger{% elif item.estado == 'completado' %}table-success{% endif %}">
+            <tr class="{% if item.estado in 'alerta_30 alerta_50 pendiente_eval_30 pendiente_eval_30_y_50' %}table-warning{% elif item.estado == 'completado_aprobado' %}table-success{% elif item.estado == 'completado_no_aprobado' or item.estado == 'pendiente_eval_30_y_50' %}table-danger{% endif %}">
               <td class="px-3 text-muted">{{ forloop.counter }}</td>
               <td><code>{{ item.obj.cedula }}</code></td>
               <td class="fw-semibold">{{ item.obj.nombres }}</td>
@@ -209,13 +209,23 @@
               </td>
               <td class="text-center">
                 {% if item.estado == 'alerta_30' %}
-                  <span class="badge bg-danger"><i class="fas fa-bell me-1"></i>Faltan {{ item.dias_para_30 }}d</span>
+                  <span class="badge bg-warning text-dark"><i class="fas fa-bell me-1"></i>Alerta — Evaluar 30d</span>
                 {% elif item.estado == 'alerta_50' %}
-                  <span class="badge bg-warning text-dark"><i class="fas fa-bell me-1"></i>Faltan {{ item.dias_para_50 }}d</span>
-                {% elif item.estado == 'completado' %}
-                  <span class="badge bg-success">Completado</span>
+                  <span class="badge bg-danger"><i class="fas fa-bell me-1"></i>Alerta — Evaluar 50d</span>
+                {% elif item.estado == 'pendiente_eval_30' %}
+                  <span class="badge bg-danger">⏳ Pendiente eval. 30d</span>
+                {% elif item.estado == 'pendiente_eval_50' %}
+                  <span class="badge bg-warning text-dark">⏳ Pendiente eval. 50d</span>
+                {% elif item.estado == 'pendiente_eval_30_y_50' %}
+                  <span class="badge bg-danger">⏳ Pendiente eval. 30 y 50d</span>
+                {% elif item.estado == 'pendiente_resultado' %}
+                  <span class="badge bg-warning text-dark">🟡 Resultado pendiente</span>
+                {% elif item.estado == 'completado_aprobado' %}
+                  <span class="badge bg-success">✅ Aprobó</span>
+                {% elif item.estado == 'completado_no_aprobado' %}
+                  <span class="badge" style="background:#990000;color:#fff;">❌ No aprobó</span>
                 {% elif item.estado == 'en_seguimiento' %}
-                  <span class="badge bg-info text-dark">En seguimiento</span>
+                  <span class="badge bg-info text-dark">🔵 En seguimiento</span>
                 {% else %}
                   <span class="badge bg-secondary">Activo</span>
                 {% endif %}
@@ -275,12 +285,14 @@
   </div>
 
   <!-- Leyenda -->
-  <div class="mt-3 d-flex gap-3 flex-wrap">
+  <div class="mt-3 d-flex gap-3 flex-wrap" style="font-size:0.85rem;">
     <span><span class="badge bg-secondary">●</span> Activo</span>
-    <span><span class="badge bg-danger">●</span> Alerta 30d</span>
-    <span><span class="badge bg-warning text-dark">●</span> Alerta 50d</span>
+    <span><span class="badge bg-warning text-dark">●</span> Alerta 30d</span>
+    <span><span class="badge bg-danger">●</span> Alerta 50d / Pend. eval.</span>
     <span><span class="badge bg-info text-dark">●</span> En seguimiento</span>
-    <span><span class="badge bg-success">●</span> Completado</span>
+    <span><span class="badge bg-warning text-dark">●</span> Pend. eval. 50d / resultado</span>
+    <span><span class="badge bg-success">●</span> Completado — Aprobó</span>
+    <span><span class="badge" style="background:#990000;">●</span> Completado — No aprobó</span>
   </div>
 
 </div>

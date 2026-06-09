@@ -60,9 +60,9 @@ def lista_colaboradores(request):
         estado = col.estado_periodo()
         if estado in ('alerta_30', 'alerta_50'):
             alertas_pendientes += 1
-        if estado in ('en_seguimiento', 'alerta_50'):
+        if estado in ('en_seguimiento', 'alerta_50', 'pendiente_eval_30', 'pendiente_eval_50', 'pendiente_eval_30_y_50', 'pendiente_resultado'):
             en_seguimiento += 1
-        if estado == 'completado':
+        if estado in ('completado_aprobado', 'completado_no_aprobado'):
             completados_count += 1
         data.append({
             'obj': col,
@@ -226,9 +226,12 @@ def completados(request):
     for col in colaboradores:
         dias = (hoy - col.fecha_ingreso).days
         if dias >= 50:
+            estado = col.estado_periodo()
             data.append({
                 'obj': col,
                 'dias': dias,
+                'estado': estado,
+                'estado_display': col.estado_display(),
             })
 
     return render(request, '_periodo_de_prueba/completados.html', {
@@ -534,12 +537,7 @@ def reporte_excel(request):
     for col in colaboradores:
         dias = (hoy - col.fecha_ingreso).days
         estado = col.estado_periodo()
-        etiqueta_estado = {
-            'en_seguimiento': 'En seguimiento',
-            'alerta_30':      'Alerta 30 días',
-            'alerta_50':      'Alerta 50 días',
-            'completado':     'Completado',
-        }.get(estado, estado)
+        etiqueta_estado = col.estado_display()
         data.append({
             'obj': col,
             'dias': dias,
@@ -640,10 +638,16 @@ def reporte_excel(request):
 
         # Color de estado
         color_estado = {
-            'En seguimiento': ("FFF2CC", "7F6000"),  # amarillo
-            'Alerta 30 días': ("FCE4D6", "833C0B"),  # naranja
-            'Alerta 50 días': ("F4CCCC", "990000"),  # rojo claro
-            'Completado':     ("E2EFDA", "375623"),  # verde
+            'Activo':                                     ("FFFFFF", "000000"),
+            '⚠️ Alerta — Evaluar 30 días':               ("FFF2CC", "7F6000"),
+            '🔴 Pendiente evaluación 30 días':            ("F4CCCC", "990000"),
+            '🔵 En seguimiento':                          ("CFE2FF", "084298"),
+            '⚠️ Alerta — Evaluar 50 días':               ("FCE4D6", "833C0B"),
+            '🔴 Pendiente eval. 30 y 50 días':           ("F4CCCC", "990000"),
+            '🟡 Pendiente evaluación 50 días':            ("FFF2CC", "7F6000"),
+            '🟡 Evaluaciones completas — Resultado pendiente': ("FFF2CC", "7F6000"),
+            '✅ Completado — Aprobó':                    ("E2EFDA", "375623"),
+            '❌ Completado — No aprobó':                 ("F4CCCC", "990000"),
         }
 
         resultado_labels = {
