@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Importar Colaboradores desde Excel{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 650px;">
+  <div class="card shadow-sm border-0">
+    <div class="card-header text-white py-3" style="background-color: #E32822;">
+      <h5 class="mb-0 fw-bold">
+        <i class="fas fa-file-excel me-2"></i>Importar Colaboradores desde Excel
+      </h5>
+    </div>
+    <div class="card-body p-4">
+
+      <!-- Instrucciones -->
+      <div class="alert border-0 mb-4" style="background-color:#FFF8F8; border-left: 4px solid #E32822 !important; border-left-style: solid !important;">
+        <p class="fw-semibold mb-2" style="color:#E32822;">
+          <i class="fas fa-info-circle me-1"></i>Instrucciones
+        </p>
+        <ol class="mb-2 small text-muted ps-3">
+          <li>Descarga la plantilla oficial haciendo clic en el botón de abajo.</li>
+          <li>Completa los datos desde la <strong>fila 5</strong> (la fila 4 es solo de ejemplo).</li>
+          <li>Guarda el archivo y cárgalo aquí.</li>
+          <li>Empresa debe ser exactamente: <code>CARBOINSA</code>, <code>INCARSA</code>, <code>UNIMINAS</code> o <code>MILPA</code>.</li>
+          <li>Fecha en formato <code>DD/MM/AAAA</code>.</li>
+        </ol>
+        <a href="{% url 'periodo:descargar_plantilla' %}" class="btn btn-sm btn-outline-success">
+          <i class="fas fa-download me-1"></i>Descargar Plantilla Excel
+        </a>
+      </div>
+
+      <!-- Formulario de carga -->
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Seleccionar archivo Excel (.xlsx)</label>
+          <input type="file" name="archivo_excel" accept=".xlsx"
+                 class="form-control" required>
+          <div class="form-text text-muted">Solo archivos .xlsx — máximo 50 colaboradores por carga.</div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-danger px-4">
+            <i class="fas fa-upload me-1"></i>Importar
+          </button>
+          <a href="{% url 'periodo:lista' %}" class="btn btn-outline-secondary px-4">
+            <i class="fas fa-arrow-left me-1"></i>Cancelar
+          </a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
